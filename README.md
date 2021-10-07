@@ -1,4 +1,15 @@
-# POET and Enhanced POET
+# CHILD POET
+CHILD POET is a modification to Enchanced POET designed to reduce resource the computational cost of the algorithm. 
+
+## Simple glossary and definitions
+- Agent model - refers to a neural net controlling the bipedal walker. Sometimes referred to simply as "model" 
+- Thetas - the neural net parameters of an agent model
+- Niche - Refers to a particular implementation of an environment, with its configuration and cppn 
+- Environment - Refers to either only the Bipedal Walker Environment, or is synonymous with niche
+- env_config - Configurations for a niche, including its name. Does not contain cppn.
+- env_parameters - Parameters for a niche encoding, mostly everything that has to do with CPPN
+
+## POET and Enhanced POET
 
 This repo contains implementation of the POET and Enhanced POET algorithms described in:
 

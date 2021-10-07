@@ -33,6 +33,7 @@ def name_env_config(ground_roughness,
 
     return env_name
 
+
 class Reproducer:
     def __init__(self, args):
         self.rs = np.random.RandomState(args.master_seed)
@@ -73,9 +74,11 @@ class Reproducer:
 
         return arr
 
-
     def mutate(self, parent, no_mutate=False):
-
+        """
+        Mutate niche configurations.
+        If no_mutate is true, the only thing that changes is the name of the niche.
+        """
         ground_roughness=parent.ground_roughness
         pit_gap = list(parent.pit_gap)
         stump_width=list(parent.stump_width)
@@ -129,9 +132,9 @@ class Reproducer:
                 stair_width = self.populate_array(stump_width, [4, 5], enforce=True)
 
             child_name = name_env_config(ground_roughness,
-                                        pit_gap,
-                                        stump_width, stump_height, stump_float,
-                                        stair_width, stair_height, stair_steps)
+                                         pit_gap,
+                                         stump_width, stump_height, stump_float,
+                                         stair_width, stair_height, stair_steps)
 
         child = Env_config(
             name=child_name,

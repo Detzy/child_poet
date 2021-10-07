@@ -7,11 +7,13 @@ fi
 
 experiment=poet_$1
 
-mkdir -p ~/ipp/$experiment
-mkdir -p ~/logs/$experiment
+mkdir -p ~/tmp/ipp/$experiment
+mkdir -p ~/tmp/logs/$experiment
+mkdir -p ~/tmp/niche_encodings/$experiment
 
 python -u master.py \
-  ~/logs/$experiment \
+  ~/tmp/logs/$experiment \
+  ~/tmp/niche_encodings/$experiment \
   --init=random \
   --learning_rate=0.01 \
   --lr_decay=0.9999 \
@@ -21,6 +23,9 @@ python -u master.py \
   --eval_batch_size=1 \
   --eval_batches_per_step=5 \
   --master_seed=24582922 \
+  --repro_threshold=200 \
+  --mc_lower=25 \
+  --mc_upper=340 \
   --noise_std=0.1 \
   --noise_decay=0.999 \
   --noise_limit=0.01 \
@@ -28,8 +33,8 @@ python -u master.py \
   --returns_normalization=centered_ranks \
   --envs stump pit roughness \
   --max_num_envs=40 \
-  --adjust_interval=6 \
+  --adjust_interval=3 \
   --propose_with_adam \
   --steps_before_transfer=25 \
-  --num_workers 10 \
-  --n_iterations=60000 2>&1 | tee ~/ipp/$experiment/run.log
+  --num_workers 2 \
+  --n_iterations=60000 2>&1 | tee ~/tmp/ipp/$experiment/run.log

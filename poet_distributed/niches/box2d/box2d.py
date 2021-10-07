@@ -29,6 +29,7 @@ DEFAULT_ENV = Env_config(
         stair_width=[],
         stair_steps=[])
 
+
 class Box2DNiche(Niche):
     def __init__(self, env_configs, env_params, seed, init='random', stochastic=False):
         self.model = Model(bipedhard_custom)
@@ -60,7 +61,6 @@ class Box2DNiche(Niche):
         self.model.make_env(seed=self.seed, env_config=DEFAULT_ENV)
         self.init = state["init"]
 
-
     def add_env(self, env):
         env_name = env.name
         assert env_name not in self.env_configs.keys()
@@ -80,7 +80,7 @@ class Box2DNiche(Niche):
             raise NotImplementedError(
                 'Undefined initialization scheme `{}`'.format(self.init))
 
-    def rollout(self, theta, random_state, eval=False):
+    def rollout(self, theta, random_state, evaluate=False, render_mode=False):
         self.model.set_model_params(theta)
         total_returns = 0
         total_length = 0
@@ -90,7 +90,9 @@ class Box2DNiche(Niche):
             seed = self.seed
         for env_config in self.env_configs.values():
             returns, lengths = simulate(
-                self.model, seed=seed, train_mode=not eval, num_episode=1, env_config_this_sim=env_config, env_params=self.env_params)
+                self.model, seed=seed, train_mode=not evaluate, render_mode=render_mode, num_episode=1,
+                env_config_this_sim=env_config, env_params=self.env_params)
             total_returns += returns[0]
             total_length += lengths[0]
         return total_returns / len(self.env_configs), total_length
+

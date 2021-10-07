@@ -65,19 +65,23 @@ def initialize_master_fiber():
     global noise
     from .noise_module import noise
 
+
 def initialize_worker_fiber(arg_thetas, arg_niches):
     global noise, thetas, niches
     from .noise_module import noise
     thetas = arg_thetas
     niches = arg_niches
 
+
 @functools.lru_cache(maxsize=1000)
 def fiber_get_theta(iteration, optim_id):
     return thetas[optim_id]
 
+
 @functools.lru_cache(maxsize=1000)
 def fiber_get_niche(iteration, optim_id):
     return niches[optim_id]
+
 
 def run_eval_batch_fiber(iteration, optim_id, batch_size, rs_seed):
     global noise, niches, thetas
@@ -89,6 +93,7 @@ def run_eval_batch_fiber(iteration, optim_id, batch_size, rs_seed):
                                            batch_size, random_state, eval=True)
 
     return EvalResult(returns=returns, lengths=lengths)
+
 
 def run_po_batch_fiber(iteration, optim_id, batch_size, rs_seed, noise_std):
     global noise, niches, thetas
@@ -114,6 +119,11 @@ def run_po_batch_fiber(iteration, optim_id, batch_size, rs_seed, noise_std):
 
 
 class ESOptimizer:
+    """
+    Class containing an agent-environment pair, and the tools to perform ES on this pair.
+    Also contains other tools, like those required for transfers between agent-environment pairs.
+    """
+
     def __init__(self,
                  fiber_pool,
                  fiber_shared,
@@ -172,7 +182,7 @@ class ESOptimizer:
         self.normalize_grads_by_noise_std = normalize_grads_by_noise_std
         self.returns_normalization = returns_normalization
 
-        if is_candidate == False:
+        if not is_candidate:
             log_fields = [
                 'po_returns_mean_{}'.format(optim_id),
                 'po_returns_median_{}'.format(optim_id),
@@ -237,7 +247,7 @@ class ESOptimizer:
         self.iteration = 0
 
     def __del__(self):
-        logger.debug('Optimizer {} cleanning up workers...'.format(
+        logger.debug('Optimizer {} cleaning up workers...'.format(
             self.optim_id))
 
     def clean_dicts_before_iter(self):
@@ -277,7 +287,7 @@ class ESOptimizer:
         logger.debug('iter={} Optimizer {} best score {}'.format(
             iteration, self.optim_id, self.best_score))
 
-        #if iteration % 100 == 0:
+        # if iteration % 100 == 0:
         #    self.save_policy(self.filename_best+'.arxiv.'+str(iteration))
 
         self.save_policy(self.filename_best)
@@ -290,7 +300,6 @@ class ESOptimizer:
                 self.best_score = None
                 self.best_theta = None
 
-
     def update_dicts_after_transfer(self, source_optim_id, source_optim_theta, stats, keyword):
         eval_key = 'eval_returns_mean_{}_from_others_in_{}'.format(keyword,  # noqa
             self.optim_id)
@@ -300,7 +309,7 @@ class ESOptimizer:
             self.log_data[eval_key] += '_' + source_optim_id + '_' + str(stats.eval_returns_mean)
 
         if keyword == 'proposal' and stats.eval_returns_mean > self.transfer_target:
-            if  stats.eval_returns_mean > self.proposal:
+            if stats.eval_returns_mean > self.proposal:
                 self.proposal = stats.eval_returns_mean
                 self.proposal_source = source_optim_id + ('' if keyword=='theta' else "_proposal")
                 self.proposal_theta = np.array(source_optim_theta)
@@ -380,9 +389,9 @@ class ESOptimizer:
                 self.timesteps_so_far,
             'time_elapsed_this_step_{}'.format(self.optim_id):
                 stats.time_elapsed_this_step + self_eval_stats.time_elapsed,
-            'accept_theta_in_{}'.format(self.optim_id): 'self'
+            'accept_theta_in_{}'.format(self.optim_id): 'self',
+            'cppn_key_in_{}'.format(self.optim_id): niches[self.optim_id].env_params.key
         })
-
 
     def broadcast_theta(self, theta):
         '''On all worker, set thetas[this optimizer] to theta'''
@@ -391,7 +400,6 @@ class ESOptimizer:
         thetas = self.fiber_shared["thetas"]
         thetas[self.optim_id] = theta
         self.iteration += 1
-
 
     def add_env(self, env):
         '''On all worker, add env_name to niche'''
@@ -405,7 +413,7 @@ class ESOptimizer:
         logger.debug('Optimizer {} delete env {}...'.format(self.optim_id, env_name))
 
         niches = self.fiber_shared["niches"]
-        niches[optim_id].delete_env(env_name)
+        niches[self.optim_id].delete_env(env_name)
 
     def start_chunk_fiber(self, runner, batches_per_chunk, batch_size, *args):
         logger.debug('Optimizer {} spawning {} batches of size {}'.format(
@@ -523,6 +531,14 @@ class ESOptimizer:
         return step_results, theta, step_t_start
 
     def get_step(self, res, propose_with_adam=True, decay_noise=True, propose_only=False):
+        """
+        I don't know entirely what this does yet
+
+        :param res:
+        :param propose_with_adam:
+        :param decay_noise:
+        :param propose_only: If true, proposes a new theta without actually updating the current theta
+        """
         step_tasks, theta, step_t_start = res
         step_results = self.get_chunk(step_tasks)
 
@@ -584,6 +600,16 @@ class ESOptimizer:
         return self_eval_stats.eval_returns_mean
 
     def update_pata_ec(self, archived_optimizers, optimizers, lower_bound, upper_bound):
+        """
+        Method for setting/updating pata-ec score for a given niche. Computes pata-ec for both current agents and
+        archived agents.
+
+        :param archived_optimizers: List of all archived optimizers to rank
+        :param optimizers: List of all currently active optimizers to rank
+        :param lower_bound: Int, lower bound for pata-ec. All scores below are set to this limit
+        :param upper_bound: Int, upper bound for pata-ec. All scores above are set to this limit
+        :return: None
+        """
         def cap_score(score, lower, upper):
             if score < lower:
                 score = lower
@@ -594,21 +620,31 @@ class ESOptimizer:
 
         raw_scores = []
         for source_optim in archived_optimizers.values():
-            raw_scores.append(cap_score(self.evaluate_theta(source_optim.theta)))
+            raw_scores.append(cap_score(self.evaluate_theta(source_optim.theta), lower_bound, upper_bound))
 
         for source_optim in optimizers.values():
-            raw_scores.append(cap_score(self.evaluate_theta(source_optim.theta)))
+            raw_scores.append(cap_score(self.evaluate_theta(source_optim.theta), lower_bound, upper_bound))
 
         self.pata_ec = compute_centered_ranks(np.array(raw_scores))
 
     def evaluate_transfer(self, optimizers, evaluate_proposal=True, propose_with_adam=False):
+        """
+        From the list of optimizers, find the agent model with the best parameters for the niche in this optimizer,
+        along with its score. If evaluate_proposal is True, also evaluates agents after one optimization step
+        (without actually changing them).
+
+        :param optimizers: List of optimizers whose agent models should be evaluated
+        :param evaluate_proposal: Bool, when True, evaluates all agent models both before and after one step of training
+        :param propose_with_adam: Bool, whether or not to use an Adam optimizer
+        :return: (int, np.array) Score and thetas of best agent in this optimizer's niche
+        """
 
         best_init_score = None
         best_init_theta = None
 
         for source_optim in optimizers.values():
             score = self.evaluate_theta(source_optim.theta)
-            if best_init_score == None or score > best_init_score:
+            if best_init_score is None or score > best_init_score:
                 best_init_score = score
                 best_init_theta = np.array(source_optim.theta)
 

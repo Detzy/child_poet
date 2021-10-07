@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from abc import abstractmethod
 
 
 class Niche:
@@ -21,6 +22,11 @@ class Niche:
 
         for i, theta in enumerate(thetas):
             returns[i], lengths[i] = self.rollout(
-                theta, random_state=random_state, eval=eval)
+                theta, random_state=random_state, evaluate=eval
+            )
 
         return returns, lengths
+
+    @abstractmethod
+    def rollout(self, theta, random_state, evaluate=False, render_mode=False):
+        raise NotImplementedError

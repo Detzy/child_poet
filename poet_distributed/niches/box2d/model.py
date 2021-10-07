@@ -123,7 +123,7 @@ class Model:
             w = self.weight[i]
             b = self.bias[i]
             h = np.matmul(h, w) + b
-            if (self.output_noise[i] and (not mean_mode)):
+            if self.output_noise[i] and (not mean_mode):
                 out_size = self.shapes[i][1]
                 out_std = self.bias_std[i]
                 output_noise = np.random.randn(out_size) * out_std
@@ -167,8 +167,9 @@ class Model:
     def get_random_model_params(self, stdev=0.1):
         return np.random.randn(self.param_count) * stdev
 
+
 def simulate(model, seed, train_mode=False, render_mode=False, num_episode=5,
-             max_len=-1, env_config_this_sim=None, env_params=None):
+             max_len=-1, env_config_this_sim=None, env_params=None, get_pos_at_death=False):
     reward_list = []
     t_list = []
 
@@ -228,4 +229,9 @@ def simulate(model, seed, train_mode=False, render_mode=False, num_episode=5,
         reward_list.append(total_reward)
         t_list.append(t)
 
-    return reward_list, t_list
+    if get_pos_at_death:
+        # This method does not handle correctly
+        return reward_list, t_list, info['pos']
+
+    else:
+        return reward_list, t_list

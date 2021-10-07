@@ -168,6 +168,10 @@ class BipedalWalkerCustom(gym.Env):
         self.config = env_config
 
     def augment(self, params):
+        """
+        Sets CPPN parameters for the environment, which encodes the altitude of the environment
+        :param params: CPPN responsible for encoding the environment, by using its altitude function: altitude_fn
+        """
         self.env_params = params
 
     def _set_terrain_number(self):
@@ -576,7 +580,7 @@ class BipedalWalkerCustom(gym.Env):
         if pos[0] > (TERRAIN_LENGTH - TERRAIN_GRASS) * TERRAIN_STEP:
             done = True
             finish = True
-        return np.array(state), reward, done, {"finish": finish}
+        return np.array(state), reward, done, {"finish": finish, "pos": pos}
 
     def render(self, *args, **kwargs):
         return self._render(*args, **kwargs)

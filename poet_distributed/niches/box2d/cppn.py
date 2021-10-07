@@ -45,6 +45,7 @@ class PrettyGenome(neat.DefaultGenome):
 
 class CppnEnvParams:
     x = np.array([(i - 200 / 2.0) / (200 / 2.0) for i in range(200)])
+
     def __init__(self, cppn_config_path='config-cppn', genome_path=None):
         self.cppn_config_path = os.path.dirname(__file__) + '/' + cppn_config_path
         self.genome_path = genome_path
@@ -65,19 +66,20 @@ class CppnEnvParams:
         net = neat.nn.FeedForwardNetwork.create(self.cppn_genome, self.cppn_config)
         self.altitude_fn = net.activate
 
-    def get_mutated_params(self):
+    def get_mutated_params(self, cppn_path_string):
         is_valid = False
         while not is_valid:
-            mutated = copy_genome(self.cppn_genome)
+            mutated = copy_genome(self.cppn_genome, cppn_path_string)
             mutated.nodes[0].response = 1.0
             mutated.key = datetime.datetime.utcnow().isoformat()
             mutated.mutate(self.cppn_config.genome_config)
-            is_valid = is_genome_valid(mutated) & (self.cppn_genome.distance(mutated, self.cppn_config.genome_config) > 0)
+            is_valid = \
+                is_genome_valid(mutated) & (self.cppn_genome.distance(mutated, self.cppn_config.genome_config) > 0)
             if not is_valid:
                 continue
             net = neat.nn.FeedForwardNetwork.create(mutated, self.cppn_config)
             y = np.array([net.activate((xi, )) for xi in self.x])
-            y -= y[0] # normalize to start at altitude 0
+            y -= y[0]  # normalize to start at altitude 0
             threshold_ = np.abs(np.max(y))
             is_valid = (threshold_ > 0)
             if not is_valid:
@@ -91,7 +93,7 @@ class CppnEnvParams:
             res.reset_altitude_fn()
             return res
 
-    def save_xy(self, folder='/tmp'):
+    def save_xy(self, folder='tmp'):
         with open(folder + '/' + self.cppn_genome.key + '_xy.json', 'w') as f:
             net = neat.nn.FeedForwardNetwork.create(self.cppn_genome, self.cppn_config)
             y = np.array([net.activate((xi, )) for xi in self.x])
@@ -103,15 +105,16 @@ class CppnEnvParams:
             'genome_path': self.genome_path,
         })
 
-    def save_genome(self):
-        file_path = '/tmp/genome_{}_saved.pickle'.format(time.time())
-        pickled = pickle.dump(self.cppn_genome, open(file_path, 'wb'))
+    def save_genome(self, path_string):
+        file_path = path_string + '/genome_{}_saved.pickle'.format(time.time())
+        pickle.dump(self.cppn_genome, open(file_path, 'wb'))
 
 
-def copy_genome(genome):
-    file_path = '/tmp/genome_{}.pickle'.format(time.time())
-    pickled = pickle.dump(genome, open(file_path, 'wb'))
+def copy_genome(genome, path_string):
+    file_path = path_string + '/genome_{}.pickle'.format(time.time())
+    pickle.dump(genome, open(file_path, 'wb'))
     return pickle.load(open(file_path, 'rb'))
+
 
 def is_genome_valid(g):
     graph = {}
