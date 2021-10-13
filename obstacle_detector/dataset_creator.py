@@ -1,4 +1,10 @@
+from collections import Iterator
+
 import tensorflow_datasets as tfds
+
+"""
+HMMM, vet ikke om dette er noe vitts?
+"""
 
 
 class ObstacleDatasetBuilder(tfds.core.GeneratorBasedBuilder):
@@ -9,20 +15,19 @@ class ObstacleDatasetBuilder(tfds.core.GeneratorBasedBuilder):
         return tfds.core.DatasetInfo(
             builder=self,
             features=tfds.features.FeaturesDict({
-                'image': tfds.features.Image(shape=(256, 256, 1)),
+                'image': tfds.features.Image(shape=(40, 40, 1)),
                 'label': tfds.features.ClassLabel(names=['obstacle', 'non_obstacle']),
             }),
         )
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
-        """Download the data and define splits."""
-        extracted_path = dl_manager.download_and_extract('http://data.org/data.zip')
-        # dl_manager returns pathlib-like objects with `path.read_text()`,
-        # `path.iterdir()`,...
+        """Assumes the files are already split into three types, training, validation and test"""
+        image_file_paths = "/home/dataset/or/something"
+
         return {
-            'training': self._generate_examples(path=extracted_path / 'training_images'),
-            'validation': self._generate_examples(path=extracted_path / 'validation_images'),
-            'test': self._generate_examples(path=extracted_path / 'test_images'),
+            'training': self._generate_examples(path=image_file_paths / 'training_images'),
+            'validation': self._generate_examples(path=image_file_paths / 'validation_images'),
+            'test': self._generate_examples(path=image_file_paths / 'test_images'),
         }
 
     def _generate_examples(self, path):
@@ -31,5 +36,5 @@ class ObstacleDatasetBuilder(tfds.core.GeneratorBasedBuilder):
             # Yields (key, example)
             yield img_path.name, {
                 'image': img_path,
-                'label': 'obstacle' if img_path.name.startswith('obstacle_') else 'non_obstacle',
+                'label': 'obstacle' if img_path.name.startswith('obstacle') else 'non_obstacle',
             }
