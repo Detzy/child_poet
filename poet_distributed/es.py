@@ -213,6 +213,7 @@ class ESOptimizer:
                 'eval_returns_mean_best_with_ckpt_in_{}'.format(optim_id),
                 'eval_returns_mean_theta_from_others_in_{}'.format(optim_id),
                 'eval_returns_mean_proposal_from_others_in_{}'.format(optim_id),
+                'cppn_key_in_{}'.format(optim_id),
             ]
             log_path = log_file + '/' + log_file.split('/')[-1] + '.' + optim_id + '.log'
             self.data_logger = CSVLogger(log_path, log_fields + [
@@ -390,7 +391,8 @@ class ESOptimizer:
             'time_elapsed_this_step_{}'.format(self.optim_id):
                 stats.time_elapsed_this_step + self_eval_stats.time_elapsed,
             'accept_theta_in_{}'.format(self.optim_id): 'self',
-            'cppn_key_in_{}'.format(self.optim_id): niches[self.optim_id].env_params.key
+            'cppn_key_in_{}'.format(self.optim_id):
+                self.fiber_shared['niches'][self.optim_id].env_params.cppn_genome.key
         })
 
     def broadcast_theta(self, theta):

@@ -61,12 +61,12 @@ class MultiESOptimizer:
         manager = mp_ctx.Manager()
         self.manager = manager
         self.fiber_shared = {
-                "niches": manager.dict(),
-                "thetas": manager.dict(),
+            "niches": manager.dict(),
+            "thetas": manager.dict(),
         }
         self.fiber_pool = mp_ctx.Pool(args.num_workers, initializer=initialize_worker_fiber,
-                initargs=(self.fiber_shared["thetas"],
-                    self.fiber_shared["niches"]))
+                                      initargs=(self.fiber_shared["thetas"],
+                                                self.fiber_shared["niches"]))
 
         self.ANNECS = 0
         self.env_registry = OrderedDict()
@@ -74,7 +74,7 @@ class MultiESOptimizer:
         self.env_reproducer = Reproducer(args)
         self.optimizers = OrderedDict()
         self.archived_optimizers = OrderedDict()
-       
+
         env = Env_config(
             name='flat',
             ground_roughness=0,
@@ -160,6 +160,8 @@ class MultiESOptimizer:
         self.env_registry[optim_id] = (env, cppn_params)
         self.env_archive[optim_id] = (env, cppn_params)
 
+        cppn_params.save_genome(self.args.niche_file)
+
     def archive_optimizer(self, optim_id):
         """
         Move optimiser from current optimizers into the archived ones
@@ -222,7 +224,7 @@ class MultiESOptimizer:
         for source_optim in self.optimizers.values():
             source_tasks = []
             for target_optim in [o for o in self.optimizers.values()
-                                    if o is not source_optim]:
+                                 if o is not source_optim]:
                 if target_optim in proposal_targets[source_optim]:
                     task = target_optim.start_step(source_optim.theta)
                     source_tasks.append((task, target_optim))

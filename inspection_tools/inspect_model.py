@@ -10,17 +10,11 @@ from poet_distributed.es import ESOptimizer
 from poet_distributed.niches.box2d.cppn import CppnEnvParams
 from poet_distributed.niches.box2d.model import Model, simulate
 from poet_distributed.niches.box2d.env import bipedhard_custom, Env_config
+from inspection_tools.file_utilities import get_cppn_file_list, get_cppn_file_iterator, \
+    get_model_file_list, get_model_file_iterator, get_latest_cppn_file
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def print_cppn_attributes(cppn_genome_path):
-    cppn_params = CppnEnvParams(genome_path=cppn_genome_path)
-    # print(cppn_params.cppn_genome)
-    print(cppn_params.cppn_genome)
-    print(cppn_params.cppn_genome.key)
-    print()
 
 
 def inspect_model(model_file, cppn_genome_path):
@@ -74,39 +68,6 @@ def draw_terrain_on_position(cppn_genome_path, pos):
 
 
 def main(model_file, cppn_genome_path):
-    # parser = ArgumentParser()
-    # parser.add_argument('--log_file', default='~/tmp/logs/$experiment')
-    # parser.add_argument('--init', default='random')
-    # parser.add_argument('--learning_rate', type=float, default=0.01)
-    # parser.add_argument('--lr_decay', type=float, default=0.9999)
-    # parser.add_argument('--lr_limit', type=float, default=0.001)
-    # parser.add_argument('--noise_std', type=float, default=0.1)
-    # parser.add_argument('--noise_decay', type=float, default=0.999)
-    # parser.add_argument('--noise_limit', type=float, default=0.01)
-    # parser.add_argument('--l2_coeff', type=float, default=0.01)
-    # parser.add_argument('--batches_per_chunk', type=int, default=50)
-    # parser.add_argument('--batch_size', type=int, default=64)
-    # parser.add_argument('--eval_batch_size', type=int, default=1)
-    # parser.add_argument('--eval_batches_per_step', type=int, default=50)
-    # parser.add_argument('--num_workers', type=int, default=20)
-    # parser.add_argument('--n_iterations', type=int, default=200)
-    # parser.add_argument('--steps_before_transfer', type=int, default=25)
-    # parser.add_argument('--master_seed', type=int, default=111)
-    # parser.add_argument('--mc_lower', type=int, default=25)
-    # parser.add_argument('--mc_upper', type=int, default=340)
-    # parser.add_argument('--repro_threshold', type=int, default=200)
-    # parser.add_argument('--max_num_envs', type=int, default=100)
-    # parser.add_argument('--normalize_grads_by_noise_std', action='store_true', default=False)
-    # parser.add_argument('--propose_with_adam', action='store_true', default=False)
-    # parser.add_argument('--checkpointing', action='store_true', default=False)
-    # parser.add_argument('--adjust_interval', type=int, default=4)
-    # parser.add_argument('--returns_normalization', default='normal')
-    # parser.add_argument('--stochastic', action='store_true', default=False)
-    # parser.add_argument('--envs', nargs='+')
-    # parser.add_argument('--start_from', default=model_file)  # Json file to start from
-
-    # args = parser.parse_args()
-    # logger.info(args)
 
     point_of_termination = inspect_model(model_file, cppn_genome_path)
     # draw_terrain_on_position(cppn_genome_path, point_of_termination)
@@ -116,25 +77,15 @@ if __name__ == "__main__":
     """
     Run a custom test of an agent and a cppn, or multiple sequentially. 
     """
-    test_run_name = 'okt4_overnight'
-    # agent_name = 'flat'
-    agent_model_folder = r'/uio/hume/student-u31/eirikolb/tmp/logs/poet_{}/'.format(test_run_name)
-    # agent_model_json_name = r'poet_{}.{}.best.json'.format(test_run_name, agent_name)
-    agent_model_json_name = r'poet_*.best.json'
-    agent_model_json = agent_model_folder + agent_model_json_name
+    test_run_name = 'okt8_overnight'
 
-    time_string = True  # String, or False
-    cppn_genome_folder = '/uio/hume/student-u31/eirikolb/tmp/niche_encodings/poet_{}/'.format(test_run_name)
-    # cppn_genome_file_name = 'genome_{}.pickle'.format(time_string)  # test just one
-    cppn_genome_file_name = 'genome_*.pickle'  # loop all
-    cppn_genome_file = cppn_genome_folder + cppn_genome_file_name
+    for current_agent_model_json in get_model_file_iterator(training_run=test_run_name):
+        current_optimizer_log_file = current_agent_model_json.split('.best.json')[0] + '.log'
 
-    for current_agent_model_json in glob.iglob(agent_model_json):
-        for current_cppn_genome_file in sorted(glob.glob(cppn_genome_file), reverse=True):
-            print("Now running agent: {} \non environment: {}".format(current_agent_model_json, current_cppn_genome_file))
-            if time_string:
-                main(model_file=current_agent_model_json, cppn_genome_path=current_cppn_genome_file)
-            else:
-                main(model_file=current_agent_model_json, cppn_genome_path=False)
-            # print_cppn_attributes(current_cppn_genome_file)
-            # input()
+        current_cppn_genome_file = get_latest_cppn_file(training_run=test_run_name,
+                                                        optimizer_log_file=current_optimizer_log_file)
+
+        print("\n\nNow running agent: {} \non environment: {}".format(current_agent_model_json,
+                                                                      current_cppn_genome_file))
+
+        main(model_file=current_agent_model_json, cppn_genome_path=current_cppn_genome_file)
