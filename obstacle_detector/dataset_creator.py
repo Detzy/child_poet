@@ -3,7 +3,7 @@ from collections import Iterator
 import tensorflow_datasets as tfds
 
 """
-HMMM, vet ikke om dette er noe vitts?
+HMMM, I do not know if this serves any purpose for me?
 """
 
 
