@@ -46,7 +46,7 @@ class NicheImageCreator:
     Images are then labeled, based on what type of event triggered the image creation.
     """
 
-    def __init__(self, cppn_params, dataset_folder=None):
+    def __init__(self, cppn_params=None, dataset_folder=None):
         """
         :param cppn_params: full file path to saved cppn parameters,
         or an instance of a CppnEnvParams object
@@ -150,8 +150,6 @@ class NicheImageCreator:
             x = i_to_x(i)
             y = self.altitude_function(x) if x > STARTPAD_LENGTH+TERRAIN_STEP else startpad_height
             j = y_to_j(y)
-
-            print(x, self.altitude_function(x), STARTPAD_LENGTH+TERRAIN_STEP, startpad_height, mid_x, mid_y)
 
             # we need discrete values for indexing. This could potentially be done by some form of cross-sampling
             rounded_j = round(j)
