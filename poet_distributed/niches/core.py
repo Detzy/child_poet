@@ -15,18 +15,17 @@ from abc import abstractmethod
 
 
 class Niche:
-    def rollout_batch(self, thetas, batch_size, random_state, eval=False):
+    def rollout_batch(self, thetas, batch_size, random_state, eval=False, gather_obstacle_dataset=False):
         import numpy as np
         returns = np.zeros(batch_size)
         lengths = np.zeros(batch_size, dtype='int')
 
         for i, theta in enumerate(thetas):
-            returns[i], lengths[i] = self.rollout(
-                theta, random_state=random_state, evaluate=eval
-            )
+            returns[i], lengths[i] = self.rollout(theta, random_state=random_state,
+                                                  evaluate=eval, gather_obstacle_dataset=gather_obstacle_dataset)
 
         return returns, lengths
 
     @abstractmethod
-    def rollout(self, theta, random_state, evaluate=False, render_mode=False):
+    def rollout(self, theta, random_state, evaluate=False, render_mode=False, gather_obstacle_dataset=False):
         raise NotImplementedError

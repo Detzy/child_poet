@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+from obstacle_detector.niche_image_creator import NicheImageCreator
 from .logger import CSVLogger
 import logging
 import numpy as np
@@ -27,7 +26,7 @@ from poet_distributed.novelty import compute_novelty_vs_archive
 logger = logging.getLogger(__name__)
 
 
-def construct_niche_fns_from_env(args, env, env_params, seed):
+def construct_niche_fns_from_env(args, env, env_params, seed, img_creator=None):
     def niche_wrapper(configs, env_params, seed):  # force python to make a new lexical scope
         def make_niche():
             from poet_distributed.niches import Box2DNiche
@@ -35,7 +34,8 @@ def construct_niche_fns_from_env(args, env, env_params, seed):
                               env_params=env_params,
                               seed=seed,
                               init=args.init,
-                              stochastic=args.stochastic)
+                              stochastic=args.stochastic,
+                              img_creator=img_creator)
 
         return make_niche
 
@@ -104,7 +104,12 @@ class MultiESOptimizer:
         assert env is not None
         assert cppn_params is not None
 
-        optim_id, niche_fn = construct_niche_fns_from_env(args=self.args, env=env, env_params=cppn_params, seed=seed)
+        img_creator = None
+        if self.args.save_to_dataset:
+            img_creator = NicheImageCreator(cppn_params=None, dataset_folder=self.args.dataset_folder)
+
+        optim_id, niche_fn = construct_niche_fns_from_env(args=self.args, env=env, env_params=cppn_params,
+                                                          seed=seed, img_creator=img_creator)
 
         niche = niche_fn()
         if model_params is not None:
@@ -182,15 +187,22 @@ class MultiESOptimizer:
         I think this is called "induce evolutionary strategy step"?
         For each optimizer, perform one step of ES, and update the optimizers agent model accordingly
 
+        (I think this previously did not use parallelization properly, so I changed it from the original.
+        This change has later been implemented similarly other places in the POET library. I hope I did it right)
+
         :param iteration: int, current iteration
         :return: None
         """
-        tasks = [o.start_step() for o in self.optimizers.values()]
-
+        tasks = [o.start_step(gather_obstacle_dataset=self.args.save_to_dataset) for o in self.optimizers.values()]
+        self_eval_tasks = []
         for optimizer, task in zip(self.optimizers.values(), tasks):
 
             optimizer.theta, stats = optimizer.get_step(task)
-            self_eval_task = optimizer.start_theta_eval(optimizer.theta)
+            self_eval_tasks.append((
+                optimizer.start_theta_eval(optimizer.theta, gather_obstacle_dataset=self.args.save_to_dataset),
+                optimizer))
+
+        for self_eval_task, optimizer in self_eval_tasks:
             self_eval_stats = optimizer.get_theta_eval(self_eval_task)
 
             logger.info('Iter={} Optimizer {} theta_mean {} best po {} iteration spent {}'.format(
@@ -201,6 +213,15 @@ class MultiESOptimizer:
                                             self_eval_stats=self_eval_stats)
 
     def transfer(self, propose_with_adam, checkpointing, reset_optimizer):
+        """
+        This method is responsible for the transfer of agent models across environments.
+        For every agent, test it in all other environments,
+        and if they exceed the currently paired agent's score, they are moved to a list of candiate transfers.
+        If the candidates also exceed the paired agent of an environment after training in the environment,
+        the best candidate replaces the currently paired agent.
+        (I think this previously did not use parallelization properly, so I changed it from the original.
+        This change has later been implemented similarly other places in the POET library. I hope I did it right)
+        """
         logger.info('Computing direct transfers...')
         proposal_targets = {}
         for source_optim in self.optimizers.values():
@@ -208,7 +229,8 @@ class MultiESOptimizer:
             proposal_targets[source_optim] = []
             for target_optim in [o for o in self.optimizers.values() if o is not source_optim]:
                 task = target_optim.start_theta_eval(
-                    source_optim.theta)
+                    source_optim.theta,
+                    gather_obstacle_dataset=self.args.save_to_dataset)
                 source_tasks.append((task, target_optim))
 
             for task, target_optim in source_tasks:
@@ -226,15 +248,22 @@ class MultiESOptimizer:
             for target_optim in [o for o in self.optimizers.values()
                                  if o is not source_optim]:
                 if target_optim in proposal_targets[source_optim]:
-                    task = target_optim.start_step(source_optim.theta)
+                    task = target_optim.start_step(source_optim.theta,
+                                                   gather_obstacle_dataset=self.args.save_to_dataset)
                     source_tasks.append((task, target_optim))
 
+            proposed_tasks = []
             for task, target_optim in source_tasks:
                 proposed_theta, _ = target_optim.get_step(
                     task, propose_with_adam=propose_with_adam, propose_only=True)
 
-                proposal_eval_task = target_optim.start_theta_eval(proposed_theta)
-                proposal_eval_stats = target_optim.get_theta_eval(proposal_eval_task)
+                proposed_tasks.append((
+                    target_optim.start_theta_eval(proposed_theta, gather_obstacle_dataset=self.args.save_to_dataset),
+                    target_optim
+                ))
+
+            for proposed_task, target_optim in proposed_tasks:
+                proposal_eval_stats = target_optim.get_theta_eval(proposed_task)
 
                 target_optim.update_dicts_after_transfer(source_optim_id=source_optim.optim_id,
                                                          source_optim_theta=proposed_theta,
@@ -341,10 +370,12 @@ class MultiESOptimizer:
                 # Create a new optimizer with the child candidate. If the agent paired with the parent env
                 # passes the minimal criterion function (is neither too good nor too bad), it is added to child_list
                 o = self.create_optimizer(new_env_config, new_cppn_params, seed, is_candidate=True)
-                score = o.evaluate_theta(self.optimizers[parent_optim_id].theta)
+                score = o.evaluate_theta(self.optimizers[parent_optim_id].theta,
+                                         gather_obstacle_dataset=self.args.save_to_dataset).eval_returns_mean
                 if self.pass_mc(score):
                     novelty_score = compute_novelty_vs_archive(self.archived_optimizers, self.optimizers, o, k=5,
-                                                               low=self.args.mc_lower, high=self.args.mc_upper)
+                                                               low=self.args.mc_lower, high=self.args.mc_upper,
+                                                               gather_obstacle_dataset=self.args.save_to_dataset)
                     logger.debug("{} passed mc, novelty score {}".format(score, novelty_score))
                     child_list.append((new_env_config, new_cppn_params, seed, parent_optim_id, novelty_score))
                 del o
@@ -374,6 +405,7 @@ class MultiESOptimizer:
         """
 
         if iteration > 0 and iteration % steps_before_adjust == 0:
+            # - Check what niches are ready for reproduction
             list_repro, list_delete = self.check_optimizer_status(iteration)
 
             if len(list_repro) == 0:
@@ -384,36 +416,49 @@ class MultiESOptimizer:
             logger.info("list of niches to delete")
             logger.info(list_delete)
 
+            # - Update pata-ec score in all niches
             for optim in self.optimizers.values():
-                optim.update_pata_ec(self.archived_optimizers, self.optimizers, self.args.mc_lower, self.args.mc_upper)
+                optim.update_pata_ec(self.archived_optimizers, self.optimizers, self.args.mc_lower, self.args.mc_upper,
+                                     gather_obstacle_dataset=self.args.save_to_dataset)
 
             for optim in self.archived_optimizers.values():
-                optim.update_pata_ec(self.archived_optimizers, self.optimizers, self.args.mc_lower, self.args.mc_upper)
+                optim.update_pata_ec(self.archived_optimizers, self.optimizers, self.args.mc_lower, self.args.mc_upper,
+                                     gather_obstacle_dataset=self.args.save_to_dataset)
 
+            # - Produce a sorted list of child niches, evolved from a random selection of the current niches.
             child_list = self.get_child_list(list_repro, max_children)
 
             if child_list is None or len(child_list) == 0:
                 logger.info("mutation to reproduce env FAILED!!!")
                 return
 
+            # - For each child niche, cross-evaluate all current and archived agent models in it, and find the best.
             admitted = 0
             for child in child_list:
                 new_env_config, new_cppn_params, seed, _, _ = child
                 # targeted transfer
                 o = self.create_optimizer(new_env_config, new_cppn_params, seed, is_candidate=True)
-                score_child, theta_child = o.evaluate_transfer(self.optimizers)
-                score_archive, _ = o.evaluate_transfer(self.archived_optimizers, evaluate_proposal=False)
+                score_child, theta_child = \
+                    o.evaluate_transfer(self.optimizers, gather_obstacle_dataset=self.args.save_to_dataset)
+                score_archive, _ = o.evaluate_transfer(self.archived_optimizers, evaluate_proposal=False,
+                                                       gather_obstacle_dataset=self.args.save_to_dataset)
                 del o
 
+                # -- If the best current agent model passes the minimal criterion, pair the new niche with that agent
                 if self.pass_mc(score_child):  # check mc
                     self.add_optimizer(env=new_env_config, cppn_params=new_cppn_params, seed=seed, created_at=iteration,
                                        model_params=np.array(theta_child))
                     admitted += 1
+
+                    # --- If the best archived agent model also passes the minimal criterion,
+                    # the ANNECS measure is increased
                     if score_archive is not None and self.pass_mc(score_archive):
                         self.ANNECS += 1
                     if admitted >= max_admitted:
                         break
 
+            # - If after this process more optimizers exist than is allowed,
+            # remove the oldest until no longer above the limit
             if max_num_envs is not None and len(self.optimizers) > max_num_envs:
                 num_removals = len(self.optimizers) - max_num_envs
                 self.remove_oldest(num_removals)
@@ -442,10 +487,11 @@ class MultiESOptimizer:
         """
         Master loop for the optimisation phase.
         Each loop, we train and adjust agents.
-        In some iterations, based on two parameters, we do:
+        In some iterations, with intervals defined by the parameters args.adjust_interval and steps_before_t..., we do:
         - Evolve new niches
         - Test performance of agents in all other niches, and transfer those that outperform
         - Save to logger what iteration transfers where made
+        - Note: evolving niches happens as often as or rarer than transfers, based on args.adjust_interval
         """
         for iteration in range(iterations):
 

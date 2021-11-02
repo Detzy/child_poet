@@ -31,7 +31,7 @@ DEFAULT_ENV = Env_config(
 
 
 class Box2DNiche(Niche):
-    def __init__(self, env_configs, env_params, seed, init='random', stochastic=False):
+    def __init__(self, env_configs, env_params, seed, init='random', stochastic=False, img_creator=None):
         self.model = Model(bipedhard_custom)
         if not isinstance(env_configs, list):
             env_configs = [env_configs]
@@ -43,6 +43,7 @@ class Box2DNiche(Niche):
         self.stochastic = stochastic
         self.model.make_env(seed=seed, env_config=DEFAULT_ENV)
         self.init = init
+        self.img_creator = img_creator
 
     def __getstate__(self):
         return {"env_configs": self.env_configs,
@@ -80,7 +81,7 @@ class Box2DNiche(Niche):
             raise NotImplementedError(
                 'Undefined initialization scheme `{}`'.format(self.init))
 
-    def rollout(self, theta, random_state, evaluate=False, render_mode=False):
+    def rollout(self, theta, random_state, evaluate=False, render_mode=False, gather_obstacle_dataset=False):
         self.model.set_model_params(theta)
         total_returns = 0
         total_length = 0
@@ -89,10 +90,21 @@ class Box2DNiche(Niche):
         else:
             seed = self.seed
         for env_config in self.env_configs.values():
-            returns, lengths = simulate(
-                self.model, seed=seed, train_mode=not evaluate, render_mode=render_mode, num_episode=1,
-                env_config_this_sim=env_config, env_params=self.env_params)
+            returns, lengths, info = simulate(self.model, seed=seed, train_mode=not evaluate, render_mode=render_mode,
+                                              num_episode=1, env_config_this_sim=env_config, env_params=self.env_params)
             total_returns += returns[0]
             total_length += lengths[0]
+
+        if gather_obstacle_dataset and self.img_creator is not None:
+            # The function should save dataset images from runtime
+            if info['game_over']:
+                label = 'obstacle'
+                self.img_creator.cppn_params = self.env_params
+                image_of_obstacle = self.img_creator.create_image(mid_x=info['pos'].x,
+                                                                  in_width=8, in_height=8,
+                                                                  out_width=32, out_height=32)
+                self.img_creator.save_image_for_dataset(image=image_of_obstacle, class_label=label,
+                                                        x_pos=info['pos'].x, cppn_key=self.env_params.cppn_genome.key)
+
         return total_returns / len(self.env_configs), total_length
 

@@ -83,19 +83,20 @@ def fiber_get_niche(iteration, optim_id):
     return niches[optim_id]
 
 
-def run_eval_batch_fiber(iteration, optim_id, batch_size, rs_seed):
+def run_eval_batch_fiber(iteration, optim_id, batch_size, rs_seed, gather_obstacle_dataset=False):
     global noise, niches, thetas
     random_state = np.random.RandomState(rs_seed)
     niche = fiber_get_niche(iteration, optim_id)
     theta = fiber_get_theta(iteration, optim_id)
 
     returns, lengths = niche.rollout_batch((theta for i in range(batch_size)),
-                                           batch_size, random_state, eval=True)
+                                           batch_size, random_state, eval=True,
+                                           gather_obstacle_dataset=gather_obstacle_dataset)
 
     return EvalResult(returns=returns, lengths=lengths)
 
 
-def run_po_batch_fiber(iteration, optim_id, batch_size, rs_seed, noise_std):
+def run_po_batch_fiber(iteration, optim_id, batch_size, rs_seed, noise_std, gather_obstacle_dataset=False):
     global noise, niches, thetas
     random_state = np.random.RandomState(rs_seed)
     niche = fiber_get_niche(iteration, optim_id)
@@ -109,11 +110,11 @@ def run_po_batch_fiber(iteration, optim_id, batch_size, rs_seed, noise_std):
 
     returns[:, 0], lengths[:, 0] = niche.rollout_batch(
         (theta + noise_std * noise.get(noise_idx, len(theta))
-         for noise_idx in noise_inds), batch_size, random_state)
+         for noise_idx in noise_inds), batch_size, random_state, gather_obstacle_dataset=gather_obstacle_dataset)
 
     returns[:, 1], lengths[:, 1] = niche.rollout_batch(
         (theta - noise_std * noise.get(noise_idx, len(theta))
-         for noise_idx in noise_inds), batch_size, random_state)
+         for noise_idx in noise_inds), batch_size, random_state, gather_obstacle_dataset=gather_obstacle_dataset)
 
     return POResult(returns=returns, noise_inds=noise_inds, lengths=lengths)
 
@@ -485,13 +486,17 @@ class ESOptimizer:
             self.optimizer.reset()
             self.noise_std = self.init_noise_std
 
-    def start_theta_eval(self, theta):
-        '''eval theta in this optimizer's niche'''
+    def start_theta_eval(self, theta, gather_obstacle_dataset=False):
+        """eval theta in this optimizer's niche"""
         step_t_start = time.time()
         self.broadcast_theta(theta)
 
         eval_tasks = self.start_chunk_fiber(
-            run_eval_batch_fiber, self.eval_batches_per_step, self.eval_batch_size)
+            run_eval_batch_fiber,
+            self.eval_batches_per_step,
+            self.eval_batch_size,
+            gather_obstacle_dataset
+        )
 
         return eval_tasks, theta, step_t_start
 
@@ -515,10 +520,11 @@ class ESOptimizer:
             time_elapsed=step_t_end - step_t_start,
         )
 
-    def start_step(self, theta=None):
-        ''' based on theta (if none, this optimizer's theta)
-            generate the P.O. cloud, and eval them in this optimizer's niche
-        '''
+    def start_step(self, theta=None, gather_obstacle_dataset=False):
+        """
+        based on theta (if none, this optimizer's theta)
+        generate the P.O. cloud, and eval them in this optimizer's niche
+        """
         step_t_start = time.time()
         if theta is None:
             theta = self.theta
@@ -528,7 +534,9 @@ class ESOptimizer:
             run_po_batch_fiber,
             self.batches_per_chunk,
             self.batch_size,
-            self.noise_std)
+            self.noise_std,
+            gather_obstacle_dataset
+        )
 
         return step_results, theta, step_t_start
 
@@ -596,20 +604,26 @@ class ESOptimizer:
             time_elapsed_this_step=step_t_end - step_t_start,
         )
 
-    def evaluate_theta(self, theta):
-        self_eval_task = self.start_theta_eval(theta)
+    def evaluate_theta(self, theta, gather_obstacle_dataset=False):
+        """
+        Changed from original enhanced poet. Now returns entire eval_stats.
+        Should be used as little as possible (I think), because it is not properly parallelized.
+        """
+        self_eval_task = self.start_theta_eval(theta, gather_obstacle_dataset)
         self_eval_stats = self.get_theta_eval(self_eval_task)
-        return self_eval_stats.eval_returns_mean
+        # return self_eval_stats.eval_returns_mean
+        return self_eval_stats
 
-    def update_pata_ec(self, archived_optimizers, optimizers, lower_bound, upper_bound):
+    def update_pata_ec(self, archived_optimizers, optimizers, lower_bound, upper_bound, gather_obstacle_dataset=False):
         """
         Method for setting/updating pata-ec score for a given niche. Computes pata-ec for both current agents and
-        archived agents.
+        archived agents. Updated to use parallelization properly since original poet.
 
         :param archived_optimizers: List of all archived optimizers to rank
         :param optimizers: List of all currently active optimizers to rank
         :param lower_bound: Int, lower bound for pata-ec. All scores below are set to this limit
         :param upper_bound: Int, upper bound for pata-ec. All scores above are set to this limit
+        :param gather_obstacle_dataset: Bool, whether or not to save images of obstacles during simulation
         :return: None
         """
         def cap_score(score, lower, upper):
@@ -621,40 +635,64 @@ class ESOptimizer:
             return score
 
         raw_scores = []
+        tasks = []
         for source_optim in archived_optimizers.values():
-            raw_scores.append(cap_score(self.evaluate_theta(source_optim.theta), lower_bound, upper_bound))
+            tasks.append(self.start_theta_eval(source_optim.theta, gather_obstacle_dataset))
 
+        for task in tasks:
+            raw_scores.append(cap_score(self.get_theta_eval(task).eval_returns_mean,
+                                        lower_bound, upper_bound))
+
+        tasks = []
         for source_optim in optimizers.values():
-            raw_scores.append(cap_score(self.evaluate_theta(source_optim.theta), lower_bound, upper_bound))
+            tasks.append(self.start_theta_eval(source_optim.theta, gather_obstacle_dataset))
+
+        for task in tasks:
+            raw_scores.append(cap_score(self.get_theta_eval(task).eval_returns_mean,
+                                        lower_bound, upper_bound))
 
         self.pata_ec = compute_centered_ranks(np.array(raw_scores))
 
-    def evaluate_transfer(self, optimizers, evaluate_proposal=True, propose_with_adam=False):
+    def evaluate_transfer(self, optimizers, evaluate_proposal=True,
+                          propose_with_adam=False, gather_obstacle_dataset=False):
         """
+        This method is used to evaluate which agent model should be paired with a newly evolved environment.
         From the list of optimizers, find the agent model with the best parameters for the niche in this optimizer,
         along with its score. If evaluate_proposal is True, also evaluates agents after one optimization step
-        (without actually changing them).
+        (without actually changing them). Updated to use parallelization properly since original poet.
 
         :param optimizers: List of optimizers whose agent models should be evaluated
         :param evaluate_proposal: Bool, when True, evaluates all agent models both before and after one step of training
         :param propose_with_adam: Bool, whether or not to use an Adam optimizer
+        :param gather_obstacle_dataset: Bool, whether or not to save images of obstacles during simulation
         :return: (int, np.array) Score and thetas of best agent in this optimizer's niche
         """
 
         best_init_score = None
         best_init_theta = None
 
-        for source_optim in optimizers.values():
-            score = self.evaluate_theta(source_optim.theta)
+        tasks = [(self.start_theta_eval(source_optim.theta, gather_obstacle_dataset), source_optim.theta)
+                 for source_optim in optimizers.values()]
+
+        for task, theta in tasks:
+            score = self.get_theta_eval(task).eval_returns_mean
+
             if best_init_score is None or score > best_init_score:
                 best_init_score = score
-                best_init_theta = np.array(source_optim.theta)
+                best_init_theta = np.array(theta)
 
-            if evaluate_proposal:
-                task = self.start_step(source_optim.theta)
-                proposed_theta, _ = self.get_step(
-                    task, propose_with_adam=propose_with_adam, propose_only=True)
-                score = self.evaluate_theta(proposed_theta)
+        if evaluate_proposal:
+            sim_tasks = [(self.start_step(source_optim.theta, gather_obstacle_dataset), source_optim)
+                         for source_optim in optimizers.values()]
+
+            tasks = []
+            for sim_task in sim_tasks:
+                proposed_theta, _ = self.get_step(sim_task, propose_with_adam=propose_with_adam, propose_only=True)
+                tasks.append((self.start_theta_eval(proposed_theta, gather_obstacle_dataset), proposed_theta))
+
+            for task, proposed_theta in tasks:
+                score = self.get_theta_eval(task).eval_returns_mean
+
                 if score > best_init_score:
                     best_init_score = score
                     best_init_theta = np.array(proposed_theta)

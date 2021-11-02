@@ -15,6 +15,7 @@
 
 import numpy as np
 
+
 def euclidean_distance(x, y):
 
     n, m = len(x), len(y)
@@ -27,9 +28,9 @@ def euclidean_distance(x, y):
     return np.sqrt(a**2 + b**2)
 
 
-def compute_novelty_vs_archive(archived_optimizers, optimizers, niche, k, low, high):
+def compute_novelty_vs_archive(archived_optimizers, optimizers, niche, k, low, high, gather_obstacle_dataset):
     distances = []
-    niche.update_pata_ec(archived_optimizers, optimizers, low, high)
+    niche.update_pata_ec(archived_optimizers, optimizers, low, high, gather_obstacle_dataset=gather_obstacle_dataset)
     for point in archived_optimizers.values():
         distances.append(euclidean_distance(point.pata_ec, niche.pata_ec))
 
