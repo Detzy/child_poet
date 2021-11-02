@@ -50,7 +50,9 @@ def sample(p):
 
 
 class Model:
-    ''' simple feedforward model '''
+    """
+    Feedforward model trained to control the bipedal agents
+    """
 
     def __init__(self, game):
         self.output_noise = game.output_noise
@@ -113,6 +115,14 @@ class Model:
                             render_mode=render_mode, env_config=env_config)
 
     def get_action(self, x, t=0, mean_mode=False):
+        """
+        Get the next action from the model, based on an input vector and (if time_input is set to 1) the current
+        iteration.
+        :param x: The list of input values for the model.
+        :param t: Current iteration. If time_input is set to 1, this is concatenated onto the list of input values.
+        :param mean_mode: if True, ignore sampling.
+        :return: Output the feed forward network.
+        """
         # if mean_mode = True, ignore sampling.
         h = np.array(x).flatten()
         if self.time_input == 1:
@@ -136,6 +146,11 @@ class Model:
         return h
 
     def set_model_params(self, model_params):
+        """
+        Convert a list of model parameters into proper internal variables of this Model object
+        :param model_params: List of parameters
+        :return: None
+        """
         pointer = 0
         for i in range(len(self.shapes)):
             w_shape = self.shapes[i]
@@ -157,19 +172,25 @@ class Model:
                 pointer += s
 
     def load_model(self, filename):
+        """
+        Load model parameters from given file
+        """
         with open(filename) as f:
             data = json.load(f)
-        print('loading file %s' % (filename))
+        print('loading file %s' % filename)
         self.data = data
         model_params = np.array(data[0])  # assuming other stuff is in data
         self.set_model_params(model_params)
 
     def get_random_model_params(self, stdev=0.1):
+        """
+        Return a random set of model parameters, typically used for initialisation
+        """
         return np.random.randn(self.param_count) * stdev
 
 
-def simulate(model, seed, train_mode=False, render_mode=False, num_episode=5,
-             max_len=-1, env_config_this_sim=None, env_params=None, get_pos_at_death=False):
+def simulate(model, seed, train_mode=False, render_mode=False, num_episode=5, max_len=-1, env_config_this_sim=None,
+             env_params=None):
     reward_list = []
     t_list = []
 
@@ -179,7 +200,7 @@ def simulate(model, seed, train_mode=False, render_mode=False, num_episode=5,
         if max_len < max_episode_length:
             max_episode_length = max_len
 
-    if (seed >= 0):
+    if seed >= 0:
         logger.debug('Setting seed to {}'.format(seed))
         random.seed(seed)
         np.random.seed(seed)
@@ -229,9 +250,4 @@ def simulate(model, seed, train_mode=False, render_mode=False, num_episode=5,
         reward_list.append(total_reward)
         t_list.append(t)
 
-    if get_pos_at_death:
-        # This method does not handle correctly
-        return reward_list, t_list, info['pos']
-
-    else:
-        return reward_list, t_list
+    return reward_list, t_list, info
