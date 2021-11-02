@@ -66,10 +66,10 @@ class CppnEnvParams:
         net = neat.nn.FeedForwardNetwork.create(self.cppn_genome, self.cppn_config)
         self.altitude_fn = net.activate
 
-    def get_mutated_params(self, cppn_path_string):
+    def get_mutated_params(self, cppn_path_string, save_cppn=False):
         is_valid = False
         while not is_valid:
-            mutated = copy_genome(self.cppn_genome, cppn_path_string)
+            mutated = copy_genome(self.cppn_genome, cppn_path_string, save_cppn)
             mutated.nodes[0].response = 1.0
             mutated.key = datetime.datetime.utcnow().isoformat()
             mutated.mutate(self.cppn_config.genome_config)
@@ -110,10 +110,13 @@ class CppnEnvParams:
         pickle.dump(self.cppn_genome, open(file_path, 'wb'))
 
 
-def copy_genome(genome, path_string):
+def copy_genome(genome, path_string, save_cppn=False):
     file_path = path_string + '/genome_{}.pickle'.format(time.time())
     pickle.dump(genome, open(file_path, 'wb'))
-    return pickle.load(open(file_path, 'rb'))
+    copied_genome = pickle.load(open(file_path, 'rb'))
+    if not save_cppn:
+        os.remove(file_path)
+    return copied_genome
 
 
 def is_genome_valid(g):
