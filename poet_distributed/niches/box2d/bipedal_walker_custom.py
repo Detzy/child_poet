@@ -1,8 +1,7 @@
 # The following code is modified from openai/gym (https://github.com/openai/gym) under the MIT License.
 
 # Modifications Copyright (c) 2020 Uber Technologies, Inc.
-
-
+import copy
 import sys
 import math
 import numpy as np
@@ -15,6 +14,7 @@ import gym
 from gym import spaces
 from gym.utils import colorize, seeding
 from collections import namedtuple
+from obstacle_detector.stumble_detector import StumbleDetector
 
 # This is simple 4-joints walker robot environment.
 #
@@ -131,6 +131,7 @@ class BipedalWalkerCustom(gym.Env):
         return "{}\nenv\n{}".format(self.__dict__, self.__dict__["np_random"].get_state())
 
     def __init__(self, env_config):
+        self.stumble_detector = StumbleDetector(max_states=100, angle_threshold=20)
         self.spec = None
         self.set_env_config(env_config)
         self.env_params = None
@@ -403,6 +404,7 @@ class BipedalWalkerCustom(gym.Env):
         return self._reset()
 
     def _reset(self):
+        self.stumble_detector.reset_state()
         self._destroy()
         self.world = Box2D.b2World()
         self.world.contactListener_bug_workaround = ContactDetector(self)
@@ -556,6 +558,9 @@ class BipedalWalkerCustom(gym.Env):
         state += [l.fraction for l in self.lidar]
         assert len(state) == 24
 
+        # Track state in stumble detector
+        self.stumble_detector.add_state(copy.copy(pos), state[0], state[8], state[13])
+
         self.scroll = pos.x - VIEWPORT_W / SCALE / 5
 
         # moving forward is a way to receive reward (normalized to get 300 on completion)
@@ -574,13 +579,17 @@ class BipedalWalkerCustom(gym.Env):
 
         done = False
         finish = False
+        failure_pos = pos
+
         if self.game_over or pos[0] < 0:
             reward = -100
             done = True
+            failure_pos = self.stumble_detector.find_stumble_pos()
         if pos[0] > (TERRAIN_LENGTH - TERRAIN_GRASS) * TERRAIN_STEP:
             done = True
             finish = True
-        return np.array(state), reward, done, {"finish": finish, "pos": pos}
+
+        return np.array(state), reward, done, {"finish": finish, "pos": failure_pos, 'game_over': self.game_over}
 
     def render(self, *args, **kwargs):
         return self._render(*args, **kwargs)
