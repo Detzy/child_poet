@@ -11,7 +11,7 @@ mkdir -p ~/tmp/ipp/$experiment
 mkdir -p ~/tmp/logs/$experiment
 mkdir -p ~/tmp/niche_encodings/$experiment
 
-python -u master.py \
+python -u basic_poet_master_script.py \
   ~/tmp/logs/$experiment \
   ~/tmp/niche_encodings/$experiment \
   --init=random \
@@ -36,5 +36,7 @@ python -u master.py \
   --adjust_interval=3 \
   --propose_with_adam \
   --steps_before_transfer=25 \
+  --max_children=8 \
+  --max_admitted=1 \
   --num_workers 2 \
   --n_iterations=60000 2>&1 | tee ~/tmp/ipp/$experiment/run.log

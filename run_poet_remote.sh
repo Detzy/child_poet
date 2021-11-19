@@ -10,7 +10,7 @@ experiment=poet_$1
 fiber run -v nfs bash -c "
   mkdir -p /persistent/ipp/$experiment &&
   mkdir -p /persistent/logs/$experiment &&
-  python3 -u master.py \
+  python3 -u basic_poet_run.py \
   /persistent/logs/$experiment \
   --init=random \
   --learning_rate=0.01 \

@@ -1,19 +1,5 @@
-# Copyright (c) 2020 Uber Technologies, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """
-Master script for starting training of Enhanced POET
+Master script for collecting dataset from Enhanced POET
 """
 
 from argparse import ArgumentParser
@@ -45,6 +31,8 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('log_file')
     parser.add_argument('niche_file')
+    parser.add_argument('dataset_folder')
+    parser.add_argument('--save_to_dataset', default=True)
     parser.add_argument('--init', default='random')
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--lr_decay', type=float, default=0.9999)
@@ -60,6 +48,8 @@ def main():
     parser.add_argument('--num_workers', type=int, default=20)
     parser.add_argument('--n_iterations', type=int, default=200)
     parser.add_argument('--steps_before_transfer', type=int, default=25)
+    parser.add_argument('--max_children', type=int, default=8)
+    parser.add_argument('--max_admitted', type=int, default=1)
     parser.add_argument('--master_seed', type=int, default=111)
     parser.add_argument('--mc_lower', type=int, default=25)
     parser.add_argument('--mc_upper', type=int, default=340)
