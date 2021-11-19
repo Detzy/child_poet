@@ -55,7 +55,7 @@ Env_config = namedtuple('Env_config', [
 ANGLE_THRESHOLD = 20
 RADIAN_THRESHOLD = ANGLE_THRESHOLD * math.pi / 180
 MAX_TRACKED_STATES = 100
-RANGE_OF_RANDOM_SELECTION = 2000  # Inverse chance of a step beeing selected as a non-obstacle
+RANGE_OF_RANDOM_SELECTION = 500  # Inverse chance of a step beeing selected as a non-obstacle
 
 FPS = 50
 SCALE = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
