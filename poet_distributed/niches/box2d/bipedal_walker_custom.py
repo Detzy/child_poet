@@ -52,6 +52,11 @@ Env_config = namedtuple('Env_config', [
     'stair_height', 'stair_width', 'stair_steps'
 ])
 
+ANGLE_THRESHOLD = 20
+RADIAN_THRESHOLD = ANGLE_THRESHOLD * math.pi / 180
+MAX_TRACKED_STATES = 100
+RANGE_OF_RANDOM_SELECTION = 2000  # Inverse chance of a step beeing selected as a non-obstacle
+
 FPS = 50
 SCALE = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
 
@@ -131,7 +136,8 @@ class BipedalWalkerCustom(gym.Env):
         return "{}\nenv\n{}".format(self.__dict__, self.__dict__["np_random"].get_state())
 
     def __init__(self, env_config):
-        self.stumble_detector = StumbleDetector(max_states=100, angle_threshold=20)
+        self.stumble_detector = StumbleDetector(max_states=MAX_TRACKED_STATES, angle_threshold=ANGLE_THRESHOLD)
+        self.non_obstacle_locations = []
         self.spec = None
         self.set_env_config(env_config)
         self.env_params = None
@@ -405,6 +411,7 @@ class BipedalWalkerCustom(gym.Env):
 
     def _reset(self):
         self.stumble_detector.reset_state()
+        self.non_obstacle_locations = []
         self._destroy()
         self.world = Box2D.b2World()
         self.world.contactListener_bug_workaround = ContactDetector(self)
@@ -561,6 +568,12 @@ class BipedalWalkerCustom(gym.Env):
         # Track state in stumble detector
         self.stumble_detector.add_state(copy.copy(pos), state[0], state[8], state[13])
 
+        # Determine whether step is viable as non_obstacle based on robot status.
+        if abs(self.hull.angle) < RADIAN_THRESHOLD and (self.legs[1].ground_contact or self.legs[3].ground_contact):
+            # Randomly determine whether to use this particular step.
+            if np.random.randint(0, RANGE_OF_RANDOM_SELECTION) == 0:
+                self.non_obstacle_locations.append(copy.copy(pos))
+
         self.scroll = pos.x - VIEWPORT_W / SCALE / 5
 
         # moving forward is a way to receive reward (normalized to get 300 on completion)
@@ -589,7 +602,9 @@ class BipedalWalkerCustom(gym.Env):
             done = True
             finish = True
 
-        return np.array(state), reward, done, {"finish": finish, "pos": failure_pos, 'game_over': self.game_over}
+        info = {"finish": finish, "pos": failure_pos, 'game_over': self.game_over,
+                "non_stumble_positions": self.non_obstacle_locations}
+        return np.array(state), reward, done, info
 
     def render(self, *args, **kwargs):
         return self._render(*args, **kwargs)
