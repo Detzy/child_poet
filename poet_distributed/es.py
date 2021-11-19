@@ -682,7 +682,7 @@ class ESOptimizer:
                 best_init_theta = np.array(theta)
 
         if evaluate_proposal:
-            sim_tasks = [(self.start_step(source_optim.theta, gather_obstacle_dataset), source_optim)
+            sim_tasks = [self.start_step(source_optim.theta, gather_obstacle_dataset)
                          for source_optim in optimizers.values()]
 
             tasks = []
