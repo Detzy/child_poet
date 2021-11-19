@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+# from obstacle_detector.niche_image_creator import NicheImageCreator
+import logging
 from ..core import Niche
 from .model import Model, simulate
 from .env import bipedhard_custom, Env_config
 from collections import OrderedDict
+logger = logging.getLogger(__name__)
+
+START_THRESHOLD = 8
+DEATH_MARGIN = 5
 
 DEFAULT_ENV = Env_config(
         name='default_env',
@@ -51,9 +56,11 @@ class Box2DNiche(Niche):
                 "seed": self.seed,
                 "stochastic": self.stochastic,
                 "init": self.init,
+                "img_file_location": self.img_creator.dataset_folder if self.img_creator is not None else None,
                 }
 
     def __setstate__(self, state):
+        from obstacle_detector.niche_image_creator import NicheImageCreator
         self.model = Model(bipedhard_custom)
         self.env_configs = state["env_configs"]
         self.env_params = state["env_params"]
@@ -61,6 +68,10 @@ class Box2DNiche(Niche):
         self.stochastic = state["stochastic"]
         self.model.make_env(seed=self.seed, env_config=DEFAULT_ENV)
         self.init = state["init"]
+        if state["img_file_location"] is not None:
+            self.img_creator = NicheImageCreator(cppn_params=self.env_params, dataset_folder=state["img_file_location"])
+        else:
+            self.img_creator = None
 
     def add_env(self, env):
         env_name = env.name
@@ -97,14 +108,33 @@ class Box2DNiche(Niche):
 
         if gather_obstacle_dataset and self.img_creator is not None:
             # The function should save dataset images from runtime
-            if info['game_over']:
-                label = 'obstacle'
-                self.img_creator.cppn_params = self.env_params
-                image_of_obstacle = self.img_creator.create_image(mid_x=info['pos'].x,
-                                                                  in_width=8, in_height=8,
-                                                                  out_width=32, out_height=32)
-                self.img_creator.save_image_for_dataset(image=image_of_obstacle, class_label=label,
-                                                        x_pos=info['pos'].x, cppn_key=self.env_params.cppn_genome.key)
+            # If the position is significantly far from the start point,
+            # and the env is not the initial, flat terrain, draw dataset images
+            if info['pos'].x > START_THRESHOLD and self.env_params.cppn_genome.key != "0":
+                if info['game_over']:
+                    # if the bot died, draw the stumble position
+                    label = 'obstacle'
+                    self.img_creator.cppn_params = self.env_params
+                    image_of_obstacle = self.img_creator.create_image(mid_x=info['pos'].x,
+                                                                      in_width=8, in_height=8,
+                                                                      out_width=32, out_height=32)
+                    self.img_creator.save_image_for_dataset(image_to_save=image_of_obstacle,
+                                                            class_label=label,
+                                                            x_pos=info['pos'].x,
+                                                            cppn_key=self.env_params.cppn_genome.key)
+
+                # For each spot labeled as non_stumbles (which could be none),
+                # check that it is significantly far from end/stumble_position, then draw it
+                label = 'non_obstacle'
+                for position in info['non_stumble_positions']:
+                    if position.x < info['pos'].x - DEATH_MARGIN:
+                        self.img_creator.cppn_params = self.env_params
+                        image_of_non_obstacle = self.img_creator.create_image(mid_x=position.x,
+                                                                              in_width=8, in_height=8,
+                                                                              out_width=32, out_height=32)
+                        self.img_creator.save_image_for_dataset(image_to_save=image_of_non_obstacle, class_label=label,
+                                                                x_pos=position.x,
+                                                                cppn_key=self.env_params.cppn_genome.key)
 
         return total_returns / len(self.env_configs), total_length
 
