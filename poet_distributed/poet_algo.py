@@ -190,16 +190,19 @@ class MultiESOptimizer:
         (I think this previously did not use parallelization properly, so I changed it from the original.
         This change has later been implemented similarly other places in the POET library. I hope I did it right)
 
+        We decide that during this process, data should not be collected. This helps remove failures from
+        incapable agents.
+
         :param iteration: int, current iteration
         :return: None
         """
-        tasks = [o.start_step(gather_obstacle_dataset=self.args.save_to_dataset) for o in self.optimizers.values()]
+        tasks = [o.start_step(gather_obstacle_dataset=False) for o in self.optimizers.values()]
         self_eval_tasks = []
         for optimizer, task in zip(self.optimizers.values(), tasks):
 
             optimizer.theta, stats = optimizer.get_step(task)
             self_eval_tasks.append((
-                optimizer.start_theta_eval(optimizer.theta, gather_obstacle_dataset=self.args.save_to_dataset),
+                optimizer.start_theta_eval(optimizer.theta, gather_obstacle_dataset=False),
                 optimizer))
 
         for self_eval_task, optimizer in self_eval_tasks:
@@ -496,7 +499,8 @@ class MultiESOptimizer:
         for iteration in range(iterations):
 
             self.adjust_envs_niches(iteration, self.args.adjust_interval * steps_before_transfer,
-                                    max_num_envs=self.args.max_num_envs)
+                                    max_num_envs=self.args.max_num_envs, max_children=self.args.max_children,
+                                    max_admitted=self.args.max_admitted)
 
             for o in self.optimizers.values():
                 o.clean_dicts_before_iter()
