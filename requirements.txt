@@ -3,3 +3,5 @@ fiber
 neat-python
 gym[box2d]
 pandas
+matplotlib
+tensorflow
