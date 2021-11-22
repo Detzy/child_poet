@@ -6,10 +6,6 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-"""
-TODO: comment this file
-"""
-
 
 def iterate_image_files(folder_path, label):
     """
