@@ -1,5 +1,6 @@
 import os
 import re
+import math
 import glob
 import numpy as np
 import pandas as pd
@@ -11,6 +12,14 @@ TODO: comment this file
 
 
 def iterate_image_files(folder_path, label):
+    """
+    Iterates through a folder, listing any image file with the given label,
+    and produces a custom np.array with file name, environment key, position of death and timestamp.
+
+    :param folder_path: Complete system path of folder containing the images
+    :param label: Label of images to include
+    :return: np.array of shape (n, 4) where n is the number of images with the given label
+    """
     cppn_genome_file = folder_path + r'/{}*.png'.format(label)
     file_iterator = glob.iglob(cppn_genome_file)
 
@@ -32,7 +41,15 @@ def iterate_image_files(folder_path, label):
     return array
 
 
-def clean(data, distance_threshold=1):
+def ensure_location_spacing(data, distance_threshold=1):
+    """
+    Method to remove images of hurdles that are too close to each other. This should remove overlap of data.
+
+    :param data: np.array from iterate_image_files, containing all image files from a given label
+    :param distance_threshold: Images closer together than this will be removed.
+    :return: np.array of size (n-k, 4) where n is the number of images with the given label and k is the number of
+    images removed because they were too close. 
+    """
     data.sort(axis=0, order=("env_key", "pos"))
     prev_env = "none"
     prev_pos = 0
@@ -52,14 +69,61 @@ def clean(data, distance_threshold=1):
     return data
 
 
-def write_to_csv(entries, folder_path, label):
-    df = pd.DataFrame(entries, columns=["env_key", "pos", "timestamp", "filename"])
-    csv_file_name = folder_path + r'/{}.csv'.format(label)
+def split_into_training_validation_test(data, tvt_distribution=(0.70, 0.20, 0.10)):
+    """
+    Takes in a np.array data set, and splits it into three categories: Training, validation and test.
+    
+    :param data: np.array with the data that should be split.
+    :param tvt_distribution: partition of data between training, validation and test.
+    Sum should be 1, and len should be 3
+    """
+
+    assert math.fsum(tvt_distribution) == 1
+    assert len(tvt_distribution) == 3
+    length = data.shape[0]
+    training, validation, test = np.split(
+        ary=data,
+        indices_or_sections=(
+            int(tvt_distribution[0] * length),
+            int(sum(tvt_distribution[0:1]) * length)
+        ),
+        axis=0
+    )
+    return training, validation, test
+
+
+def write_to_csv(data, folder_path, label, tvt_type):
+    """
+    Write a pandas csv-file containing cleaned and split data with a given label and training/validation/test type.
+
+    :param data: np.array containing the data that should be written to file
+    :param folder_path: Full path of the folder in which to save the data
+    :param label: The label of the data in :param data:
+    :param tvt_type: One of either "training", "validation" and "test".
+    :return: The file name of the csv-file saved during this method.
+    """
+    df = pd.DataFrame(data, columns=["env_key", "pos", "timestamp", "filename"])
+    if not os.path.exists(folder_path + r'/{}'.format(tvt_type)):
+        os.mkdir(folder_path + r'/{}'.format(tvt_type))
+    csv_file_name = folder_path + r'/{}/{}.csv'.format(tvt_type, label)
     df.to_csv(csv_file_name)
     return csv_file_name
 
 
-def display_images(csv_file, image_folder, wait_for_input=True):
+def display_images(csv_file, image_folder=None):
+    """
+    Display the images in a given csv-file! Only shows one image at a time,
+    so use keyboard buttons "right" and "left" to navigate, and "escape" to terminate the program.
+
+    :param csv_file: Full path to csv-file containing the images to display
+    :param image_folder: Full path to the folder containing the images.
+    When None, uses the folder in which the csv-file is located.
+    :return: None
+    """
+
+    if image_folder is None:
+        image_folder = os.path.dirname(csv_file)
+
     df = pd.read_csv(csv_file)
     curr_pos = [0]
 
@@ -75,12 +139,12 @@ def display_images(csv_file, image_folder, wait_for_input=True):
 
         curr_pos[0] = curr_pos[0] % df.shape[0]
 
-        filename, key, pos = df.loc[curr_pos[0], ["filename", "env_key", "pos"]]
-        img = plt.imread(image_folder + "/" + filename)
+        _filename, _key, _pos = df.loc[curr_pos[0], ["filename", "env_key", "pos"]]
+        _img = plt.imread(image_folder + "/" + _filename)
 
         ax.cla()
-        ax.set_title("key: " + key + " | pos: " + str(pos))
-        ax.imshow(img, vmin=0, vmax=1)
+        ax.set_title("key: " + _key + " | pos: " + str(_pos))
+        ax.imshow(_img, vmin=0, vmax=1)
         fig.canvas.draw()
 
     fig = plt.figure()
@@ -97,15 +161,38 @@ def display_images(csv_file, image_folder, wait_for_input=True):
 
 if __name__ == "__main__":
     current_folder_path = r'/uio/hume/student-u31/eirikolb/img/poet_15_nov_24h'
+
+    # Clean and visualize data for non-obstacles
     current_label = "non_obstacle"
     array_of_entries = iterate_image_files(folder_path=current_folder_path, label=current_label)
-    cleaned_entries = clean(array_of_entries, distance_threshold=1)
-    csv_filename_non_obstacle = write_to_csv(cleaned_entries, folder_path=current_folder_path, label=current_label)
+    cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
 
+    current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
+    split_data = {
+        "training": current_training,
+        "validation": current_validation,
+        "test": current_test,
+    }
+    for data_type in split_data:
+        csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
+                                    label=current_label, tvt_type=data_type)
+        display_images(csv_filename, image_folder=current_folder_path)
+
+    # Clean and visualize data for non-obstacles
     current_label = "obstacle"
     array_of_entries = iterate_image_files(folder_path=current_folder_path, label=current_label)
-    cleaned_entries = clean(array_of_entries, distance_threshold=1)
-    csv_filename_obstacle = write_to_csv(cleaned_entries, folder_path=current_folder_path, label=current_label)
+    cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
 
-    display_images(csv_filename_obstacle, current_folder_path, wait_for_input=True)
+    current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
+    split_data = {
+        "training": current_training,
+        "validation": current_validation,
+        "test": current_test,
+    }
+    for data_type in split_data:
+        csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
+                                    label=current_label, tvt_type=data_type)
+        display_images(csv_filename, image_folder=current_folder_path)
+
+
 
