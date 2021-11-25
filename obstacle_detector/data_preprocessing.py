@@ -7,6 +7,32 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 
+def load_dataset_from_csv(parent_folder_path, data_type, labels=("obstacle", "non_obstacle"), max_unbalance_degree=1):
+    """
+    This method assumes folder given contains one subfolder with the images named /img_files,
+    and one folder for each of the data_types "
+    """
+    seed = 123
+    img_folder_path = parent_folder_path + "/img_files"
+    csv_folder_path = parent_folder_path + "/{}".format(data_type)
+
+    data_frames = []
+    smallest = math.inf
+    for label in labels:
+        df = pd.read_csv(csv_folder_path + "/{}.csv".format(label))
+        smallest = min(df.shape[0], smallest)
+        data_frames.append(df)
+
+    data_frames = [df.sample(n=min(smallest*max_unbalance_degree, df.shape[0]), random_state=seed) for df in data_frames]
+
+    full_data_frame = pd.concat(data_frames)
+
+    temp = img_folder_path + "/{}"
+    full_data_frame["filename"] = full_data_frame["filename"].map(temp.format)
+
+    return full_data_frame["filename"], full_data_frame["label"]
+
+
 def iterate_image_files(folder_path, label):
     """
     Iterates through a folder, listing any image file with the given label,
@@ -32,8 +58,9 @@ def iterate_image_files(folder_path, label):
         timestamps.append(timestamp)
         filenames.append(file_name)
 
-    dtype = [("env_key", 'U26'), ("pos", float), ("timestamp", float), ("filename", 'U100')]
-    array = np.array(list(zip(keys, positions, timestamps, filenames)), dtype=dtype)
+    labels = [label for i in filenames]
+    dtype = [("env_key", 'U26'), ("pos", float), ("timestamp", float), ("filename", 'U100'), ("label", 'U50')]
+    array = np.array(list(zip(keys, positions, timestamps, filenames, labels)), dtype=dtype)
     return array
 
 
@@ -51,7 +78,7 @@ def ensure_location_spacing(data, distance_threshold=1):
     prev_pos = 0
     entries_to_keep = []
     for i in range(data.shape[0]):
-        key, pos, _, _ = data[i]
+        key, pos, _, _, _ = data[i]
         if prev_env != key:
             prev_env = key
         elif prev_pos + distance_threshold < pos:
@@ -81,7 +108,7 @@ def split_into_training_validation_test(data, tvt_distribution=(0.70, 0.20, 0.10
         ary=data,
         indices_or_sections=(
             int(tvt_distribution[0] * length),
-            int(sum(tvt_distribution[0:1]) * length)
+            int(sum(tvt_distribution[:2]) * length)
         ),
         axis=0
     )
@@ -98,7 +125,7 @@ def write_to_csv(data, folder_path, label, tvt_type):
     :param tvt_type: One of either "training", "validation" and "test".
     :return: The file name of the csv-file saved during this method.
     """
-    df = pd.DataFrame(data, columns=["env_key", "pos", "timestamp", "filename"])
+    df = pd.DataFrame(data, columns=["env_key", "pos", "timestamp", "filename", "label"])
     if not os.path.exists(folder_path + r'/{}'.format(tvt_type)):
         os.mkdir(folder_path + r'/{}'.format(tvt_type))
     csv_file_name = folder_path + r'/{}/{}.csv'.format(tvt_type, label)
@@ -154,13 +181,13 @@ def display_images(csv_file, image_folder=None):
     ax.imshow(img, vmin=0, vmax=1)
     plt.show()
 
-
 if __name__ == "__main__":
-    current_folder_path = r'/uio/hume/student-u31/eirikolb/img/poet_15_nov_24h'
+    current_folder_path = r'/uio/hume/student-u31/eirikolb/img/poet_18_nov_72h'
+    unbalance_degree = 4 # Only used for printing information
 
     # Clean and visualize data for non-obstacles
     current_label = "non_obstacle"
-    array_of_entries = iterate_image_files(folder_path=current_folder_path, label=current_label)
+    array_of_entries = iterate_image_files(folder_path=current_folder_path+'/img_files', label=current_label)
     cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
 
     current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
@@ -172,11 +199,11 @@ if __name__ == "__main__":
     for data_type in split_data:
         csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
                                     label=current_label, tvt_type=data_type)
-        display_images(csv_filename, image_folder=current_folder_path)
+        # display_images(csv_filename, image_folder=current_folder_path)
 
     # Clean and visualize data for non-obstacles
     current_label = "obstacle"
-    array_of_entries = iterate_image_files(folder_path=current_folder_path, label=current_label)
+    array_of_entries = iterate_image_files(folder_path=current_folder_path+'/img_files', label=current_label)
     cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
 
     current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
@@ -188,7 +215,16 @@ if __name__ == "__main__":
     for data_type in split_data:
         csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
                                     label=current_label, tvt_type=data_type)
-        display_images(csv_filename, image_folder=current_folder_path)
+        # display_images(csv_filename, image_folder=current_folder_path)
+
+    # Fetch dataset with given unbalance degree and print number of images fetched.
+    res = load_dataset_from_csv(current_folder_path, data_type="training", max_unbalance_degree=unbalance_degree)
+    print(
+        "Dataset with unbalance degree {} gives {} images".format(
+            unbalance_degree,
+            res[0].shape[0],
+        )
+    )
 
 
 
