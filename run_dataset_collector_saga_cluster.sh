@@ -6,10 +6,10 @@
 #SBATCH --account=nn9740k
 #
 # Wall clock limit (hh:mm:ss):
-#SBATCH --time=24:00:00
+#SBATCH --time=72:00:00
 #
 ## Allocates 10 cpus
-#SBATCH --ntasks=1 --cpus-per-task=10
+#SBATCH --ntasks=1 --cpus-per-task=20
 #
 ## allocates 1 GB ram per cpu
 #SBATCH --mem-per-cpu=1G
@@ -78,12 +78,12 @@ srun python -u dataset_collector_master_script.py \
   --returns_normalization=centered_ranks \
   --envs stump pit roughness \
   --max_num_envs=40 \
-  --adjust_interval=3 \
+  --adjust_interval=1 \
   --propose_with_adam \
   --steps_before_transfer=25 \
   --max_children=16 \
   --max_admitted=2 \
-  --num_workers 8 \
+  --num_workers 20 \
   --n_iterations=60000 2>&1 | tee ~/tmp/ipp/$experiment/run.log
 
 ## Exit 
