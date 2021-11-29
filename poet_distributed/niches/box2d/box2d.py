@@ -57,6 +57,7 @@ class Box2DNiche(Niche):
                 "stochastic": self.stochastic,
                 "init": self.init,
                 "img_file_location": self.img_creator.dataset_folder if self.img_creator is not None else None,
+                "distance_threshold": self.img_creator.distance_threshold if self.img_creator is not None else None,
                 }
 
     def __setstate__(self, state):
@@ -69,7 +70,8 @@ class Box2DNiche(Niche):
         self.model.make_env(seed=self.seed, env_config=DEFAULT_ENV)
         self.init = state["init"]
         if state["img_file_location"] is not None:
-            self.img_creator = NicheImageCreator(cppn_params=self.env_params, dataset_folder=state["img_file_location"])
+            self.img_creator = NicheImageCreator(cppn_params=self.env_params, dataset_folder=state["img_file_location"],
+                                                 distance_threshold=state["distance_threshold"])
         else:
             self.img_creator = None
 
@@ -114,27 +116,34 @@ class Box2DNiche(Niche):
                 if info['game_over']:
                     # if the bot died, draw the stumble position
                     label = 'obstacle'
-                    self.img_creator.cppn_params = self.env_params
-                    image_of_obstacle = self.img_creator.create_image(mid_x=info['pos'].x,
-                                                                      in_width=8, in_height=8,
-                                                                      out_width=32, out_height=32)
-                    self.img_creator.save_image_for_dataset(image_to_save=image_of_obstacle,
-                                                            class_label=label,
-                                                            x_pos=info['pos'].x,
-                                                            cppn_key=self.env_params.cppn_genome.key)
+                    if self.img_creator.valid_x_pos(mid_x=info['pos'].x,
+                                                    cppn_key=self.env_params.cppn_genome.key,
+                                                    class_label=label):
+                        self.img_creator.cppn_params = self.env_params
+                        image_of_obstacle = self.img_creator.create_image(mid_x=info['pos'].x,
+                                                                          in_width=8, in_height=8,
+                                                                          out_width=32, out_height=32)
+                        self.img_creator.save_image_for_dataset(image_to_save=image_of_obstacle,
+                                                                class_label=label,
+                                                                x_pos=info['pos'].x,
+                                                                cppn_key=self.env_params.cppn_genome.key)
 
                 # For each spot labeled as non_stumbles (which could be none),
                 # check that it is significantly far from end/stumble_position, then draw it
                 label = 'non_obstacle'
                 for position in info['non_stumble_positions']:
                     if position.x < info['pos'].x - DEATH_MARGIN:
-                        self.img_creator.cppn_params = self.env_params
-                        image_of_non_obstacle = self.img_creator.create_image(mid_x=position.x,
-                                                                              in_width=8, in_height=8,
-                                                                              out_width=32, out_height=32)
-                        self.img_creator.save_image_for_dataset(image_to_save=image_of_non_obstacle, class_label=label,
-                                                                x_pos=position.x,
-                                                                cppn_key=self.env_params.cppn_genome.key)
+                        if self.img_creator.valid_x_pos(mid_x=info['pos'].x,
+                                                        cppn_key=self.env_params.cppn_genome.key,
+                                                        class_label=label):
+                            self.img_creator.cppn_params = self.env_params
+                            image_of_non_obstacle = self.img_creator.create_image(mid_x=position.x,
+                                                                                  in_width=8, in_height=8,
+                                                                                  out_width=32, out_height=32)
+                            self.img_creator.save_image_for_dataset(image_to_save=image_of_non_obstacle,
+                                                                    class_label=label,
+                                                                    x_pos=position.x,
+                                                                    cppn_key=self.env_params.cppn_genome.key)
 
         return total_returns / len(self.env_configs), total_length
 

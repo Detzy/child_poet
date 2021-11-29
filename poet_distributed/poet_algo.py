@@ -107,7 +107,8 @@ class MultiESOptimizer:
 
         img_creator = None
         if self.args.save_to_dataset:
-            img_creator = NicheImageCreator(cppn_params=None, dataset_folder=self.args.dataset_folder)
+            img_creator = NicheImageCreator(cppn_params=None, dataset_folder=self.args.dataset_folder,
+                                            distance_threshold=self.args.distance_threshold)
 
         optim_id, niche_fn = construct_niche_fns_from_env(args=self.args, env=env, env_params=cppn_params,
                                                           seed=seed, img_creator=img_creator)

@@ -46,15 +46,19 @@ class NicheImageCreator:
     Images are then labeled, based on what type of event triggered the image creation.
     """
 
-    def __init__(self, cppn_params=None, dataset_folder=None):
+    def __init__(self, cppn_params=None, dataset_folder=None, distance_threshold=3):
         """
         :param cppn_params: full file path to saved cppn parameters,
         or an instance of a CppnEnvParams object
         :param dataset_folder: absolute path of the location to save dataset images
+        :param distance_threshold: Sets how far away locations in an environment have to be
+        for us to save images of them. Should be so far that images of the same obstacle are not produced.
         """
         self.cppn_params = cppn_params
         self.dataset_folder = dataset_folder
         self.current_image = None
+        self.used_x_pos = {}
+        self.distance_threshold = distance_threshold
 
     @property
     def dataset_folder(self):
@@ -97,6 +101,28 @@ class NicheImageCreator:
             self._cppn_params = cppn
         else:
             self._cppn_params = CppnEnvParams(genome_path=cppn)
+
+    def valid_x_pos(self, mid_x, cppn_key, class_label):
+        """
+        Returns False if the input x is too closed to an already produced image. Returns True and stores the x
+        if it is sufficiently far from any previously used x-positions.
+        :param mid_x: int, x position that is a candidate to be saved as image.
+        :param cppn_key: key of the cppn_environment associated with mid_x.
+        :param class_label: the label of the class, most likely "obstacle" or "non-obstacle" unless more classes
+        have been introduced since writing this.
+        :returns: True if mid_x is valid, else False
+        """
+        if self.used_x_pos.get(class_label) is None:
+            self.used_x_pos[class_label] = {}
+        if self.used_x_pos[class_label].get(cppn_key) is None:
+            self.used_x_pos[class_label][cppn_key] = []
+
+        distances = [abs(mid_x-prev_x) for prev_x in self.used_x_pos[class_label][cppn_key]]
+        if min(distances) > self.distance_threshold:
+            self.used_x_pos[class_label][cppn_key].append(mid_x)
+            return True
+
+        return False
 
     def altitude_function(self, x):
         transformed_x = (x - MID) * np.pi / MID

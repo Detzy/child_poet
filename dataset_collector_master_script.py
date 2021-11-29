@@ -35,6 +35,7 @@ def main():
     parser.add_argument('niche_file')
     parser.add_argument('dataset_folder')
     parser.add_argument('--save_to_dataset', default=True)
+    parser.add_argument('--distance_threshold', type=float, default=3)
     parser.add_argument('--init', default='random')
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--lr_decay', type=float, default=0.9999)
