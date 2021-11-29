@@ -82,7 +82,7 @@ srun python -u dataset_collector_master_script.py \
   --propose_with_adam \
   --steps_before_transfer=25 \
   --max_children=16 \
-  --max_admitted=2 \
+  --max_admitted=3 \
   --num_workers 20 \
   --n_iterations=60000 2>&1 | tee ~/tmp/ipp/$experiment/run.log
 
