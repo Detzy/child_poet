@@ -185,38 +185,43 @@ def display_images(csv_file, image_folder=None):
 if __name__ == "__main__":
     current_folder_path = r'/uio/hume/student-u31/eirikolb/img/poet_18_nov_72h'
     unbalance_degree = 4  # Only used for printing information
+    only_print_number_of_files = False
+    should_display_images = False
 
-    # Clean and visualize data for non-obstacles
-    current_label = "non_obstacle"
-    array_of_entries = iterate_image_files(folder_path=current_folder_path+'/img_files', label=current_label)
-    cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
+    if not only_print_number_of_files:
+        # Clean and visualize data for non-obstacles
+        current_label = "non_obstacle"
+        array_of_entries = iterate_image_files(folder_path=current_folder_path+'/img_files', label=current_label)
+        cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
 
-    current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
-    split_data = {
-        "training": current_training,
-        "validation": current_validation,
-        "test": current_test,
-    }
-    for data_type in split_data:
-        csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
-                                    label=current_label, tvt_type=data_type)
-        # display_images(csv_filename, image_folder=current_folder_path)
+        current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
+        split_data = {
+            "training": current_training,
+            "validation": current_validation,
+            "test": current_test,
+        }
+        for data_type in split_data:
+            csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
+                                        label=current_label, tvt_type=data_type)
+            if should_display_images:
+                display_images(csv_filename, image_folder=current_folder_path)
 
-    # Clean and visualize data for non-obstacles
-    current_label = "obstacle"
-    array_of_entries = iterate_image_files(folder_path=current_folder_path+'/img_files', label=current_label)
-    cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
+        # Clean and visualize data for non-obstacles
+        current_label = "obstacle"
+        array_of_entries = iterate_image_files(folder_path=current_folder_path+'/img_files', label=current_label)
+        cleaned_entries = ensure_location_spacing(array_of_entries, distance_threshold=1)
 
-    current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
-    split_data = {
-        "training": current_training,
-        "validation": current_validation,
-        "test": current_test,
-    }
-    for data_type in split_data:
-        csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
-                                    label=current_label, tvt_type=data_type)
-        # display_images(csv_filename, image_folder=current_folder_path)
+        current_training, current_validation, current_test = split_into_training_validation_test(cleaned_entries)
+        split_data = {
+            "training": current_training,
+            "validation": current_validation,
+            "test": current_test,
+        }
+        for data_type in split_data:
+            csv_filename = write_to_csv(data=split_data[data_type], folder_path=current_folder_path,
+                                        label=current_label, tvt_type=data_type)
+            if should_display_images:
+                display_images(csv_filename, image_folder=current_folder_path)
 
     # Fetch dataset with given unbalance degree and print number of images fetched.
     res = load_dataset_from_csv(current_folder_path, data_type="training", max_unbalance_degree=unbalance_degree)
