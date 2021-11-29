@@ -181,9 +181,10 @@ def display_images(csv_file, image_folder=None):
     ax.imshow(img, vmin=0, vmax=1)
     plt.show()
 
+
 if __name__ == "__main__":
     current_folder_path = r'/uio/hume/student-u31/eirikolb/img/poet_18_nov_72h'
-    unbalance_degree = 4 # Only used for printing information
+    unbalance_degree = 4  # Only used for printing information
 
     # Clean and visualize data for non-obstacles
     current_label = "non_obstacle"
