@@ -53,7 +53,7 @@ if __name__ == "__main__":
     """
     Run a custom test of an agent and a cppn, or multiple sequentially. 
     """
-    test_run_name = 'okt4_overnight'
+    test_run_name = 'nov9_test'
 
     for current_agent_model_json in get_model_file_iterator(training_run=test_run_name):
         current_optimizer_log_file = current_agent_model_json.split('.best.json')[0] + '.log'
@@ -64,4 +64,4 @@ if __name__ == "__main__":
         print("\n\nNow running agent: {} \non environment: {}".format(current_agent_model_json,
                                                                       current_cppn_genome_file))
 
-        inspect_model(model_file=current_agent_model_json, cppn_genome_path=current_cppn_genome_file)
+        inspect_model(model_file=current_agent_model_json, cppn_genome=current_cppn_genome_file)
