@@ -15,6 +15,7 @@ from obstacle_detector.niche_image_creator import NicheImageCreator
 from .logger import CSVLogger
 import logging
 import numpy as np
+import mlflow as mlf
 from poet_distributed.es import ESOptimizer
 from poet_distributed.es import initialize_worker_fiber
 from collections import OrderedDict
@@ -457,6 +458,8 @@ class MultiESOptimizer:
                     # the ANNECS measure is increased
                     if score_archive is not None and self.pass_mc(score_archive):
                         self.ANNECS += 1
+                        mlf.log_metric("ANNECS", self.ANNECS)
+                        mlf.log_metric("iteration", self.iteration)
                     if admitted >= max_admitted:
                         break
 
@@ -494,7 +497,7 @@ class MultiESOptimizer:
         - Evolve new niches
         - Test performance of agents in all other niches, and transfer those that outperform
         - Save to logger what iteration transfers where made
-        - Note: evolving niches happens as often as or rarer than transfers, based on args.adjust_interval
+        - Note: evolving niches happens as often as, or rarer than transfers, based on args.adjust_interval
         """
         for iteration in range(iterations):
 

@@ -19,6 +19,7 @@ Master script for starting training of Enhanced POET
 from argparse import ArgumentParser
 import logging
 import numpy as np
+import mlflow as mlf
 from poet_distributed.es import initialize_master_fiber
 from poet_distributed.poet_algo import MultiESOptimizer
 logging.basicConfig(level=logging.INFO)
@@ -79,6 +80,9 @@ def main():
 
     args = parser.parse_args()
     logger.info(args)
+
+    for arg_name in args.__dict__:
+        mlf.log_metric(arg_name, args.__dict__[arg_name])
 
     run_main(args)
 
