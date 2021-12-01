@@ -71,7 +71,7 @@ def main():
     logger.info(args)
 
     for arg_name in args.__dict__:
-        mlf.log_metric(arg_name, args.__dict__[arg_name])
+        mlf.log_param(arg_name, args.__dict__[arg_name])
 
     run_main(args)
 
