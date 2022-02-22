@@ -3,6 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from poet_distributed.niches.box2d.cppn import CppnEnvParams
+from threading import Lock
 
 # Define sizes used to determine cppn input
 # to ensure same input as when cppn was trained.
@@ -45,6 +46,8 @@ class NicheImageCreator:
     or a random decision to select a place where an agent did well.
     Images are then labeled, based on what type of event triggered the image creation.
     """
+    used_x_pos = {}
+    lock = Lock()
 
     def __init__(self, cppn_params=None, dataset_folder=None, distance_threshold=3):
         """
@@ -57,7 +60,6 @@ class NicheImageCreator:
         self.cppn_params = cppn_params
         self.dataset_folder = dataset_folder
         self.current_image = None
-        self.used_x_pos = {}
         self.distance_threshold = distance_threshold
 
     @property
@@ -112,17 +114,26 @@ class NicheImageCreator:
         have been introduced since writing this.
         :returns: True if mid_x is valid, else False
         """
-        if self.used_x_pos.get(class_label) is None:
-            self.used_x_pos[class_label] = {}
-        if self.used_x_pos[class_label].get(cppn_key) is None:
-            self.used_x_pos[class_label][cppn_key] = []
+        result = False
+        NicheImageCreator.lock.acquire()  # We lock this section to ensure it is thread safe
 
-        distances = [abs(mid_x-prev_x) for prev_x in self.used_x_pos[class_label][cppn_key]]
-        if min(distances) > self.distance_threshold:
-            self.used_x_pos[class_label][cppn_key].append(mid_x)
-            return True
+        if NicheImageCreator.used_x_pos.get(class_label) is None:
+            # If the given class has not yet had any images saved, create a dict
+            NicheImageCreator.used_x_pos[class_label] = {}
 
-        return False
+        if NicheImageCreator.used_x_pos[class_label].get(cppn_key) is None:
+            # If the given cppn_encoded environment has not yet had any images saved, create a list, and add the input x
+            NicheImageCreator.used_x_pos[class_label][cppn_key] = [mid_x]
+            result = True
+        else:
+            # Check if any previous images are too close to the one currently considered as candidate
+            distances = [abs(mid_x-prev_x) for prev_x in NicheImageCreator.used_x_pos[class_label][cppn_key]]
+            if min(distances) > self.distance_threshold:
+                NicheImageCreator.used_x_pos[class_label][cppn_key].append(mid_x)
+                result = True
+
+        NicheImageCreator.lock.release()
+        return result
 
     def altitude_function(self, x):
         transformed_x = (x - MID) * np.pi / MID
