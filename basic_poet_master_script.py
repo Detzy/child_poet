@@ -81,8 +81,11 @@ def main():
     args = parser.parse_args()
     logger.info(args)
 
-    for arg_name in args.__dict__:
-        mlf.log_metric(arg_name, args.__dict__[arg_name])
+    mlf_runs = r'file:/uio/hume/student-u31/eirikolb/Documents/child_poet/mlruns'
+    mlf.set_tracking_uri(mlf_runs)
+    mlf.create_experiment(name="Basic POET run")
+
+    mlf.log_params(args.__dict__)
 
     run_main(args)
 

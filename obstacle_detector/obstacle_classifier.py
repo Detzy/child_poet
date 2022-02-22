@@ -141,6 +141,7 @@ if __name__ == "__main__":
     model_save_path = r'/uio/hume/student-u31/eirikolb/Documents/child_poet/cnn_models'
     mlf_runs = r'file:/uio/hume/student-u31/eirikolb/Documents/child_poet/mlruns'
     mlf.set_tracking_uri(mlf_runs)
+    mlf.create_experiment(name="Obstacle classification")
 
     # resume, start_from = True, 150
 
