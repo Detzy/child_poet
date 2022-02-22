@@ -1,56 +1,127 @@
-import pandas as pd
 import tensorflow as tf
 import obstacle_detector.data_preprocessing as dp
-from tensorflow.keras import datasets, layers, models
-import matplotlib.pyplot as plt
+from tensorflow.keras import layers, models
+import mlflow as mlf
 
 
 class ObstacleClassifier:
 
-    def __init__(self, img_height, img_width):
+    def __init__(self, img_height, img_width, n_classes, cp_callback=None):
+        """
+
+        Parameters
+        ----------
+        img_height  :   int
+                        Height of the input images
+        img_width   :   int
+                        Width of the input images
+        n_classes   :   int
+                        Number of classes for the training data
+        cp_callback :   ModelCheckpoint object, optional
+                        Model Checkpoint from tf.keras.callbacks, used to log the weights of the model during training
+        """
         self.model = models.Sequential()
-        self.model.add(layers.Conv2D(16, (3, 3), activation='relu', input_shape=(img_height, img_width, 1)))
+        self.model.add(layers.Conv2D(filters=8, kernel_size=(3, 3), activation='relu', input_shape=(img_height, img_width, 1)))
         self.model.add(layers.MaxPooling2D((2, 2)))
-        self.model.add(layers.Conv2D(32, (3, 3), activation='relu'))
+        self.model.add(layers.Conv2D(8, (3, 3), activation='relu'))
         self.model.add(layers.MaxPooling2D((2, 2)))
-        self.model.add(layers.Conv2D(32, (3, 3), activation='relu'))
+        self.model.add(layers.Conv2D(8, (3, 3), activation='relu'))
         self.model.add(layers.Flatten())
-        self.model.add(layers.Dense(32, activation='relu'))
-        self.model.add(layers.Dense(2))
+        self.model.add(layers.Dense(units=16, activation='relu'))
+        self.model.add(layers.Dense(units=n_classes))
         self.model.summary()
 
         self.model.compile(optimizer='adam',
-                           loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                           loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
                            metrics=['accuracy'])
 
-    def train(self, training_ds, validation_ds):
-        history = self.model.fit(training_ds, validation_data=validation_ds, epochs=10)
+        self.cp_callback = cp_callback
+
+    def train(self, n_epochs, training_ds, validation_ds=None):
+
+        callback = [self.cp_callback] if self.cp_callback is not None else None
+
+        if validation_ds is None:
+            history = self.model.fit(
+                training_ds,
+                epochs=n_epochs,
+                validation_split=0.2,
+                callbacks=callback)
+        else:
+            history = self.model.fit(
+                training_ds,
+                validation_data=validation_ds,
+                epochs=n_epochs,
+                callbacks=callback)
         return history
+
+    def evaluate(self, ds_to_evaluate_on):
+        res = self.model.evaluate(ds_to_evaluate_on)
+        return res
 
     def classify(self, ds_to_classify):
         res = self.model.predict(ds_to_classify)
-        print(res)
+        return res
+
+    def save_model(self, path):
+        self.model.save(path)
+
+    def load_model(self, path):
+        self.model = tf.keras.models.load_model(path)
+        print(self.model.summary())
+
+    def resume_from_checkpoint(self, path):
+        self.model.load_weights(path)
+        print(self.model.summary())
 
 
-def get_tvt_datasets(parent_folder_path, labels_to_include=("obstacle", "non_obstacle"),
-                     batch_size=10, max_unbalance_degree=1):
-    tvt = ["training", "validation", "test"]
-    tvt_datasets = []
-    for data_type in tvt:
-        files, labels = dp.load_dataset_from_csv(
-            parent_folder_path=parent_folder_path,
-            data_type=data_type,
-            labels=labels_to_include,
-            max_unbalance_degree=max_unbalance_degree,
-        )
+def get_dcc_dataset(img_folder, label_data_path, ttv_split=(0.7, 0.2), batch_size=10, max_imbalance_degree=-1):
+    """
+    Loads an image dataset, clustered by DCC, from a csv file. Converts the dataset to one hot encoding,
+    and wraps it in the tensorflow Dataset class. The dataset is split into training, validation and test data.
 
-        labels = labels.map({label: i for i, label in enumerate(labels_to_include)})
+    Parameters
+    ----------
+    img_folder              : str
+                              Path to the folder containing the images of the dataset
+    label_data_path         : str
+                              Path to the file containing the DCC labels of the dataset
+    ttv_split               : tuple of float, default=(0.7, 0.2)
+                              Tuple of length 2 containing the fraction of the dataset assigned to training data,
+                              and then the fraction of the dataset assigned to validation data.
+                              The remaining fraction will be test data.
+    batch_size              : int, default=10
+                              Batch size of the output Dataset-objects
+    max_imbalance_degree    : int, default=-1
+                              Imbalance degree between largest and second largest class.
+                              NOTE: THIS IS NOT YET IMPLEMENTED, ANY VALUE OTHER THAN -1 WILL RAISE ERROR
 
-        dataset = tf.data.Dataset.from_tensor_slices((files.values, labels.values))
-        tvt_datasets.append(dataset.map(read_image).batch(batch_size))
+    Returns
+    -------
+    training_ds         : tf.Dataset
+    validation_ds       : tf.Dataset
+    test_ds             : tf.Dataset
+    number_of_classes   : int
+                          The number of classes in the labeled data set
+    """
+    assert sum(ttv_split) <= 1
 
-    training_ds, validation_ds, test_ds = tvt_datasets
-    return training_ds, validation_ds, test_ds
+    filenames, labels, number_of_classes = dp.load_cluster_dataset(img_folder_path=img_folder, csv_path=label_data_path,
+                                                                   max_imbalance_degree=max_imbalance_degree)
+
+    labels = tf.one_hot(labels.values, number_of_classes)
+
+    dataset = tf.data.Dataset.from_tensor_slices((filenames.values, labels))
+    dataset = dataset.map(read_image).batch(batch_size)
+
+    train_size = int(ttv_split[0] * len(dataset))
+    validation_size = int(ttv_split[1] * len(dataset))
+
+    training_ds = dataset.take(train_size)
+    validation_ds = dataset.skip(train_size).take(validation_size)
+    test_ds = dataset.skip(train_size + validation_size)
+
+    return training_ds, validation_ds, test_ds, number_of_classes
 
 
 def read_image(image_file, label):
@@ -60,19 +131,48 @@ def read_image(image_file, label):
 
 
 if __name__ == "__main__":
-    curr_dataset_folder = r'/uio/hume/student-u31/eirikolb/img/poet_18_nov_72h'
-    curr_labels = ("obstacle", "non_obstacle")
-    curr_batch_size = 10
-    unbalance_degree = 2
-    training, validation, test = get_tvt_datasets(
-        curr_dataset_folder,
-        labels_to_include=curr_labels,
-        batch_size=curr_batch_size,
-        max_unbalance_degree=unbalance_degree
-    )
+    # Inputs
+    img_folder = r'/uio/hume/student-u31/eirikolb/img/poet_dec2_168h/img_files'
+    label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30_imbalance_degree4.csv'
+    # label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30.csv'
 
-    oc = ObstacleClassifier(32, 32)
-    oc.train(training, validation)
-    oc.classify(test)
-    print(test)
+    # Outputs/saves
+    checkpoint_path = r'/uio/hume/student-u31/eirikolb/tmp/cnn_logs/{}epochs_cp.ckpt'
+    model_save_path = r'/uio/hume/student-u31/eirikolb/Documents/child_poet/cnn_models'
+    mlf_runs = r'file:/uio/hume/student-u31/eirikolb/Documents/child_poet/mlruns'
+    mlf.set_tracking_uri(mlf_runs)
 
+    # resume, start_from = True, 150
+
+    curr_batch_size = 250
+    epochs = (30, 50, 80, 100, 150, 200)
+    results = []
+
+    for e in epochs:
+
+        train_data, val_data, test_data, n_classes = get_dcc_dataset(
+            img_folder,
+            label_data_path=label_data,
+            batch_size=curr_batch_size
+        )
+
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(
+            filepath=checkpoint_path.format(e),
+            save_weights_only=True,
+            verbose=1,
+        )
+
+        oc = ObstacleClassifier(32, 32, n_classes=n_classes, cp_callback=cp_callback)
+
+        mlf.tensorflow.autolog(every_n_iter=1)
+
+        oc.train(n_epochs=e, training_ds=train_data, validation_ds=val_data)
+        test_result = oc.evaluate(test_data)
+
+        results.append(test_result)
+        oc.save_model(model_save_path+r'/{}epochs_{}test_score'.format(e, test_result[1]))
+        mlf.end_run()
+
+    for e, r in zip(epochs, results):
+        print("Epochs: {} | Test result: {}".format(e, r[1]))
+    # print(test)
