@@ -2,20 +2,23 @@ import tensorflow as tf
 import obstacle_detector.data_preprocessing as dp
 from tensorflow.keras import layers, models
 import mlflow as mlf
+import numpy as np
+
+DEFAULT_MODEL = r'/uio/hume/student-u31/eirikolb/Documents/child_poet/cnn_models/default_model'
 
 
 class ObstacleClassifier:
 
-    def __init__(self, img_height, img_width, n_classes, cp_callback=None):
+    def __init__(self, img_height=32, img_width=32, n_classes=2, cp_callback=None):
         """
 
         Parameters
         ----------
-        img_height  :   int
+        img_height  :   int, default=32
                         Height of the input images
-        img_width   :   int
+        img_width   :   int, default=32
                         Width of the input images
-        n_classes   :   int
+        n_classes   :   int, default=1
                         Number of classes for the training data
         cp_callback :   ModelCheckpoint object, optional
                         Model Checkpoint from tf.keras.callbacks, used to log the weights of the model during training
@@ -130,35 +133,23 @@ def read_image(image_file, label):
     return image, label
 
 
-if __name__ == "__main__":
-    # Inputs
-    img_folder = r'/uio/hume/student-u31/eirikolb/img/poet_dec2_168h/img_files'
-    label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30_imbalance_degree4.csv'
-    # label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30.csv'
+def main(img_folder, label_file, checkpoint_save_path, model_save_path, mlf_runs_save_path,
+         experiment_name=None, batch_size=250, epochs=(100,)):
+    mlf.set_tracking_uri(mlf_runs_save_path)
+    if experiment_name is not None:
+        mlf.create_experiment(name=experiment_name)
 
-    # Outputs/saves
-    checkpoint_path = r'/uio/hume/student-u31/eirikolb/tmp/cnn_logs/{}epochs_cp.ckpt'
-    model_save_path = r'/uio/hume/student-u31/eirikolb/Documents/child_poet/cnn_models'
-    mlf_runs = r'file:/uio/hume/student-u31/eirikolb/Documents/child_poet/mlruns'
-    mlf.set_tracking_uri(mlf_runs)
-    mlf.create_experiment(name="Obstacle classification")
-
-    # resume, start_from = True, 150
-
-    curr_batch_size = 250
-    epochs = (30, 50, 80, 100, 150, 200)
     results = []
 
     for e in epochs:
-
         train_data, val_data, test_data, n_classes = get_dcc_dataset(
             img_folder,
-            label_data_path=label_data,
-            batch_size=curr_batch_size
+            label_data_path=label_file,
+            batch_size=batch_size
         )
 
         cp_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkpoint_path.format(e),
+            filepath=checkpoint_save_path.format(e),
             save_weights_only=True,
             verbose=1,
         )
@@ -176,4 +167,22 @@ if __name__ == "__main__":
 
     for e, r in zip(epochs, results):
         print("Epochs: {} | Test result: {}".format(e, r[1]))
-    # print(test)
+
+
+if __name__ == "__main__":
+    # Inputs
+    img_folder = r'/uio/hume/student-u31/eirikolb/img/poet_dec2_168h/img_files'
+    label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30_imbalance_degree4.csv'
+    # label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30.csv'
+
+    # Outputs/saves
+    checkpoint_path = r'/uio/hume/student-u31/eirikolb/tmp/cnn_logs/{}epochs_cp.ckpt'
+    model_path = r'/uio/hume/student-u31/eirikolb/Documents/child_poet/cnn_models'
+    mlf_runs = r'file:/uio/hume/student-u31/eirikolb/Documents/child_poet/mlruns'
+
+    curr_batch_size = 250
+    epochs = (30, 50, 80, 100, 150, 200)
+    # epochs = (250, 300, 350, 400, 450)
+
+    main(img_folder, label_data, checkpoint_path, model_path, mlf_runs, curr_batch_size, epochs)
+
