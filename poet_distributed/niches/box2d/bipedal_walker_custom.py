@@ -80,7 +80,7 @@ VIEWPORT_H = 400
 TERRAIN_STEP = 14 / SCALE
 TERRAIN_LENGTH = 200     # in steps
 TERRAIN_HEIGHT = VIEWPORT_H / SCALE / 4
-TERRAIN_GRASS = 10    # low long are grass spots, in steps
+TERRAIN_GRASS = 10    # how long are grass spots, in steps
 TERRAIN_STARTPAD = 20    # in steps
 FRICTION = 2.5
 
