@@ -19,6 +19,8 @@ import numpy as np
 from collections import namedtuple
 from .stats import compute_centered_ranks, batched_weighted_sum
 from .logger import CSVLogger
+from obstacle_detector.obstacle_library import ObstacleLibrary
+from obstacle_detector.obstacle_classifier import ObstacleClassifier, DEFAULT_MODEL
 import json
 import functools
 
@@ -121,8 +123,9 @@ def run_po_batch_fiber(iteration, optim_id, batch_size, rs_seed, noise_std, gath
 
 class ESOptimizer:
     """
-    Class containing an agent-environment pair, and the tools to perform ES on this pair.
-    Also contains other tools, like those required for transfers between agent-environment pairs.
+    Class responsible for an agent-environment pair, and the tools to perform ES on this pair.
+    Contains tools like those required for transfers between agent-environment pairs,
+    and has access to all other agents and niches, through the shared dictionary "fiber shared".
     """
 
     def __init__(self,
@@ -146,7 +149,8 @@ class ESOptimizer:
                  optim_id=0,
                  log_file='unname.log',
                  created_at=0,
-                 is_candidate=False):
+                 is_candidate=False,
+                 predict_simulation=False):
 
         from .optimizers import Adam, SimpleSGD
 
@@ -171,6 +175,15 @@ class ESOptimizer:
         self.fiber_shared = fiber_shared
         niches = fiber_shared["niches"]
         niches[optim_id] = make_niche()
+
+        # SET UP FOR CHILD POET
+        self.predict_simulation = predict_simulation
+        self.obstacle_lib = None
+        if self.predict_simulation:
+            img_creator = niches[optim_id].img_creator
+            img_classifier = ObstacleClassifier()
+            img_classifier.load_model(DEFAULT_MODEL)
+            self.obstacle_lib = ObstacleLibrary(img_creator, img_classifier)
 
         self.batches_per_chunk = batches_per_chunk
         self.batch_size = batch_size
