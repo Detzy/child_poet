@@ -121,7 +121,8 @@ def scale_cluster_zero(filenames, clustering, size_multiplier=4):
 
 def reduce_dcc_clusters(cluster_data_directory, out_data_dir, k, lr, class_zero_size_multiplier=-1, thresholds=(20,)):
     """
-    Main method for limiting DCC-clusters to only values above/equal to a threshold.
+    Main method for limiting DCC-clusters to only classes where the total number of images
+    are above/equal to one or multiple thresholds.
     Saved the permitted DCC-clusters to a file, one file for each threshold given
 
     Parameters
@@ -182,7 +183,17 @@ def reduce_dcc_clusters(cluster_data_directory, out_data_dir, k, lr, class_zero_
         })
 
         if class_zero_size_multiplier > 0:
-            scale_cluster_zero(filenames=filenames, clustering=clusters, size_multiplier=class_zero_size_multiplier)
+            scaled_filenames, scaled_clusters = scale_cluster_zero(
+                filenames=filenames,
+                clustering=clusters,
+                size_multiplier=class_zero_size_multiplier
+            )
+
+            df = pd.DataFrame({
+                'cluster': scaled_clusters,
+                'filename': scaled_filenames,
+            })
+
             path_to_csv = os.path.join(
                 img_cluster_path,
                 r'img_k{}_lr{}_threshold{}_imbalance_degree{}.csv'.format(k, lr, threshold, class_zero_size_multiplier)
