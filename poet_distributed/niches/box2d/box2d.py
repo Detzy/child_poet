@@ -36,6 +36,11 @@ DEFAULT_ENV = Env_config(
 
 
 class Box2DNiche(Niche):
+    """
+    The Box2DNiche serves as a container and interface for an individual environment.
+    To simulate an agent in the environment, the rollout method is used, with the parameters of
+    the agent given as an input argument.
+    """
     def __init__(self, env_configs, env_params, seed, init='random', stochastic=False, img_creator=None):
         self.model = Model(bipedhard_custom)
         if not isinstance(env_configs, list):
