@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from obstacle_detector.niche_image_creator import NicheImageCreator
-from .logger import CSVLogger
 import logging
 import numpy as np
 import mlflow as mlf
+from obstacle_detector.niche_image_creator import NicheImageCreator
 from poet_distributed.es import ESOptimizer
 from poet_distributed.es import initialize_worker_fiber
 from collections import OrderedDict
@@ -64,10 +63,13 @@ class MultiESOptimizer:
         self.fiber_shared = {
             "niches": manager.dict(),
             "thetas": manager.dict(),
+            "trackers": manager.dict(),
         }
         self.fiber_pool = mp_ctx.Pool(args.num_workers, initializer=initialize_worker_fiber,
                                       initargs=(self.fiber_shared["thetas"],
-                                                self.fiber_shared["niches"]))
+                                                self.fiber_shared["niches"],
+                                                self.fiber_shared["trackers"],
+                                                ))
 
         self.ANNECS = 0
         self.env_registry = OrderedDict()
@@ -141,7 +143,9 @@ class MultiESOptimizer:
             noise_limit=self.args.noise_limit,
             log_file=self.args.log_file,
             created_at=created_at,
-            is_candidate=is_candidate)
+            is_candidate=is_candidate,
+            predict_simulation=self.args.run_child_poet
+        )
 
     def add_optimizer(self, env, cppn_params, seed, created_at=0, model_params=None):
         """
