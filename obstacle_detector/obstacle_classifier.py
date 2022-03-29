@@ -172,7 +172,8 @@ def main(img_folder, label_file, checkpoint_save_path, model_save_path, mlf_runs
 if __name__ == "__main__":
     # Inputs
     img_folder = r'/uio/hume/student-u31/eirikolb/img/poet_dec2_168h/img_files'
-    label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30_imbalance_degree4.csv'
+    label_data = \
+        r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30_imbalance_degree4_man_relabel.csv'
     # label_data = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30.csv'
 
     # Outputs/saves
@@ -181,8 +182,12 @@ if __name__ == "__main__":
     mlf_runs = r'file:/uio/hume/student-u31/eirikolb/Documents/child_poet/mlruns'
 
     curr_batch_size = 250
-    epochs = (30, 50, 80, 100, 150, 200)
+    epochs = (30, 50, 80, 100, 150, 200, 250, 300, 350, 400, 450)
+    experiment_name = 'Manual Relabeling'
     # epochs = (250, 300, 350, 400, 450)
 
-    main(img_folder, label_data, checkpoint_path, model_path, mlf_runs, curr_batch_size, epochs)
+    main(
+        img_folder, label_data, checkpoint_path, model_path, mlf_runs,
+        experiment_name=experiment_name, batch_size=curr_batch_size, epochs=epochs
+    )
 
