@@ -70,7 +70,7 @@ class NicheImageCreator:
         if self._dataset_folder is not None:
             return self._dataset_folder
         else:
-            print("No folder has been set as dataset location")
+            return None
 
     @dataset_folder.setter
     def dataset_folder(self, folder):
