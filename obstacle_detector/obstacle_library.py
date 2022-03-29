@@ -71,6 +71,9 @@ class ObstacleLibrary:
             self.label_certainty.append(max(c))
             self.obstacle_classes.append(np.argmax(c))
 
+    def get_terrain_classes(self):
+        return self.obstacle_classes, self.obstacle_positions
+
     def display_images(self, number_of_images_to_show=None):
         """
         Just a simple tool to display all classified images.
