@@ -66,6 +66,9 @@ def main():
     parser.add_argument('--stochastic', action='store_true', default=False)
     parser.add_argument('--envs', nargs='+')
     parser.add_argument('--start_from', default=None)  # Json file to start from
+    parser.add_argument('--run_child_poet', default=False)
+    parser.add_argument('--omit_simulation', default=False)
+    parser.add_argument('--child_success_reward', type=float, default=0.5)
 
     args = parser.parse_args()
     logger.info(args)
