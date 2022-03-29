@@ -19,9 +19,9 @@ class SharedNoiseTable(object):
         import multiprocessing
         seed = 42
         # 1 gigabyte of 32-bit numbers. Will actually sample 2 gigabytes below.
-        # ## WE SET THE NUMBER DOWN TO A TENTH CAUSE IT ISNT SHARED
+        # ## WE SET THE NUMBER DOWN TO 1/100th OF ORIGINAL CAUSE IT EATS INFINITE MEMORY ON THREADS
         # count = 250000000 if not debug else 1000000
-        count = 25000000 if not debug else 1000000
+        count = 2500000 if not debug else 1000000
         logger.info('Sampling {} random numbers with seed {}'.format(
             count, seed))
         self._shared_mem = multiprocessing.Array(ctypes.c_float, count)
