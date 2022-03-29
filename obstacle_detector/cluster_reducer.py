@@ -11,6 +11,34 @@ except ImportError:
     import pickle
 
 
+def manual_relabeling(in_path, out_path, relabel_dict):
+    """
+    Function for (manual) relabeling of files based on a clustering file and a dictionary that maps classes together.
+
+    Parameters
+    ----------
+    in_path         :   str,
+                        full path a csv to the file containing the old labels.
+    out_path        :   str,
+                        full path to the new csv file the function should to create.
+    relabel_dict    :   dict,
+                        key=str, value=lists of ints,
+
+    Returns
+    -------
+
+    """
+    df = pd.read_csv(in_path, index_col=[0])
+    clustering = df['cluster']
+
+    for new_class_label, old_class_labels in relabel_dict.items():
+        clustering = [int(new_class_label) if label in old_class_labels else label for label in clustering]
+
+    clustering = make_cluster_values_adjacent(clustering)
+    df['cluster'] = clustering
+    df.to_csv(out_path)
+
+
 def threshold_clusters(clustering, file_names, threshold):
     """
     Method to split clustering into those above and below some threshold.
@@ -220,5 +248,22 @@ if __name__ == '__main__':
         thresholds=thresholds,
         class_zero_size_multiplier=imbalance_degree,
     )
+
+    # # This does a manual relabeling to combine some classes that are deemed too similar from visual inspection
+    # relabel_dict = {
+    #     "1": [1, 14, 19, 21, 25, 51, 54, 61, 66, 67],
+    #     "2": [2, 3, 18, 22, 37, 42, 49, 59, 62, 74],
+    #     "16": [16, 28, 32, 40, 55, 57, 58, 65, 71, 76],
+    #     "27": [27, 36, 48, 50, 56],
+    #     "38": [38, 46, 60, 69, 72, 78],
+    #
+    # }
+    #
+    # clustering_path = r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30_imbalance_degree4.csv'
+    # out_clustering_path = \
+    #     r'/uio/hume/student-u31/eirikolb/img/img_clusters/img_k30_lr0_1_threshold30_imbalance_degree4_man_relabel.csv'
+    # manual_relabeling(in_path=clustering_path, out_path=out_clustering_path, relabel_dict=relabel_dict)
+
+
 
 
