@@ -14,6 +14,7 @@
 import logging
 import numpy as np
 import mlflow as mlf
+import json
 from obstacle_detector.niche_image_creator import NicheImageCreator
 from poet_distributed.es import ESOptimizer
 from poet_distributed.es import initialize_worker_fiber
@@ -24,6 +25,14 @@ from poet_distributed.reproduce_ops import Reproducer
 from poet_distributed.novelty import compute_novelty_vs_archive
 
 logger = logging.getLogger(__name__)
+
+
+def load_agent_model(filename):
+    with open(filename) as f:
+        data = json.load(f)
+    print('loading file %s' % filename)
+    model_params = np.array(data[0])
+    return model_params
 
 
 def construct_niche_fns_from_env(args, env, env_params, seed, img_creator=None):
@@ -54,6 +63,7 @@ class MultiESOptimizer:
     def __init__(self, args):
 
         self.args = args
+        self.predict_simulation = self.args.run_child_poet
 
         import fiber as mp
 
@@ -63,12 +73,10 @@ class MultiESOptimizer:
         self.fiber_shared = {
             "niches": manager.dict(),
             "thetas": manager.dict(),
-            "trackers": manager.dict(),
         }
         self.fiber_pool = mp_ctx.Pool(args.num_workers, initializer=initialize_worker_fiber,
                                       initargs=(self.fiber_shared["thetas"],
                                                 self.fiber_shared["niches"],
-                                                self.fiber_shared["trackers"],
                                                 ))
 
         self.ANNECS = 0
@@ -89,8 +97,12 @@ class MultiESOptimizer:
             stair_width=[],
             stair_steps=[])
 
+        agent_model = None
+        if args.start_from is not None:
+            agent_model = load_agent_model(args.start_from)
+
         params = CppnEnvParams()
-        self.add_optimizer(env=env, cppn_params=params, seed=args.master_seed)
+        self.add_optimizer(env=env, cppn_params=params, seed=args.master_seed, model_params=agent_model)
 
     def create_optimizer(self, env, cppn_params, seed, created_at=0, model_params=None, is_candidate=False):
         """
@@ -111,6 +123,9 @@ class MultiESOptimizer:
         if self.args.save_to_dataset:
             img_creator = NicheImageCreator(cppn_params=None, dataset_folder=self.args.dataset_folder,
                                             distance_threshold=self.args.distance_threshold)
+        elif self.args.run_child_poet:
+            img_creator = NicheImageCreator(cppn_params=None, dataset_folder=None,
+                                            distance_threshold=None)
 
         optim_id, niche_fn = construct_niche_fns_from_env(args=self.args, env=env, env_params=cppn_params,
                                                           seed=seed, img_creator=img_creator)
@@ -144,7 +159,10 @@ class MultiESOptimizer:
             log_file=self.args.log_file,
             created_at=created_at,
             is_candidate=is_candidate,
-            predict_simulation=self.args.run_child_poet
+            predict_simulation=self.args.run_child_poet,
+            omit_simulation=self.args.omit_simulation,
+            agent_tracker_success_reward=self.args.child_success_reward,
+            agent_tracker_certainty_threshold=self.args.agent_tracker_certainty_threshold
         )
 
     def add_optimizer(self, env, cppn_params, seed, created_at=0, model_params=None):
@@ -206,9 +224,11 @@ class MultiESOptimizer:
         self_eval_tasks = []
         for optimizer, task in zip(self.optimizers.values(), tasks):
 
+            # Update the theta of each optimizer based on training results
             optimizer.theta, stats = optimizer.get_step(task)
             self_eval_tasks.append((
-                optimizer.start_theta_eval(optimizer.theta, gather_obstacle_dataset=False),
+                optimizer.start_theta_eval(optimizer.theta, agent_tracker=None,
+                                           gather_obstacle_dataset=False, predict_simulation=False),
                 optimizer))
 
         for self_eval_task, optimizer in self_eval_tasks:
@@ -229,7 +249,8 @@ class MultiESOptimizer:
         If the candidates also exceed the paired agent of an environment after training in the environment,
         the best candidate replaces the currently paired agent.
         (I think this previously did not use parallelization properly, so I changed it from the original.
-        This change has later been implemented similarly other places in the POET library. I hope I did it right)
+        This change has later been implemented similarly other places in the POET library. I hope I did it right.
+        (I did not do it right. It was fine all along.))
         """
         logger.info('Computing direct transfers...')
         proposal_targets = {}
@@ -239,7 +260,9 @@ class MultiESOptimizer:
             for target_optim in [o for o in self.optimizers.values() if o is not source_optim]:
                 task = target_optim.start_theta_eval(
                     source_optim.theta,
-                    gather_obstacle_dataset=self.args.save_to_dataset)
+                    source_optim.agent_tracker,
+                    gather_obstacle_dataset=self.args.save_to_dataset,
+                    predict_simulation=self.predict_simulation)
                 source_tasks.append((task, target_optim))
 
             for task, target_optim in source_tasks:
@@ -267,9 +290,12 @@ class MultiESOptimizer:
                     task, propose_with_adam=propose_with_adam, propose_only=True)
 
                 proposed_tasks.append((
-                    target_optim.start_theta_eval(proposed_theta, gather_obstacle_dataset=self.args.save_to_dataset),
-                    target_optim
-                ))
+                    target_optim.start_theta_eval(
+                        proposed_theta,
+                        agent_tracker=None,
+                        gather_obstacle_dataset=self.args.save_to_dataset,
+                        predict_simulation=False
+                    ), target_optim))
 
             for proposed_task, target_optim in proposed_tasks:
                 proposal_eval_stats = target_optim.get_theta_eval(proposed_task)
@@ -379,8 +405,11 @@ class MultiESOptimizer:
                 # Create a new optimizer with the child candidate. If the agent paired with the parent env
                 # passes the minimal criterion function (is neither too good nor too bad), it is added to child_list
                 o = self.create_optimizer(new_env_config, new_cppn_params, seed, is_candidate=True)
-                score = o.evaluate_theta(self.optimizers[parent_optim_id].theta,
-                                         gather_obstacle_dataset=self.args.save_to_dataset).eval_returns_mean
+                eval_stats = o.evaluate_theta(self.optimizers[parent_optim_id].theta,
+                                              self.optimizers[parent_optim_id].agent_tracker,
+                                              gather_obstacle_dataset=self.args.save_to_dataset)
+                score = eval_stats.eval_returns_mean
+
                 if self.pass_mc(score):
                     novelty_score = compute_novelty_vs_archive(self.archived_optimizers, self.optimizers, o, k=5,
                                                                low=self.args.mc_lower, high=self.args.mc_upper,
@@ -441,7 +470,7 @@ class MultiESOptimizer:
                 logger.info("mutation to reproduce env FAILED!!!")
                 return
 
-            # - For each child niche, cross-evaluate all current and archived agent models in it, and find the best.
+            # - For each child niche, cross-evaluate current and archived agent models in it, and find the best agent.
             admitted = 0
             for child in child_list:
                 new_env_config, new_cppn_params, seed, _, _ = child
@@ -505,7 +534,7 @@ class MultiESOptimizer:
         - Note: evolving niches happens as often as, or rarer than transfers, based on args.adjust_interval
         """
         for iteration in range(iterations):
-
+            # evolve new niches
             self.adjust_envs_niches(iteration, self.args.adjust_interval * steps_before_transfer,
                                     max_num_envs=self.args.max_num_envs, max_children=self.args.max_children,
                                     max_admitted=self.args.max_admitted)
@@ -513,13 +542,16 @@ class MultiESOptimizer:
             for o in self.optimizers.values():
                 o.clean_dicts_before_iter()
 
+            # perform evolution to train and adjust agents
             self.ind_es_step(iteration=iteration)
 
+            # perform transfer
             if len(self.optimizers) > 1 and iteration % steps_before_transfer == 0:
                 self.transfer(propose_with_adam=propose_with_adam,
                               checkpointing=checkpointing,
                               reset_optimizer=reset_optimizer)
 
+            # log what iterations transfers were made
             if iteration % steps_before_transfer == 0:
                 for o in self.optimizers.values():
                     o.save_to_logger(iteration)
