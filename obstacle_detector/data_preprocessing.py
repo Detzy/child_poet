@@ -9,8 +9,21 @@ from matplotlib import pyplot as plt
 
 def load_cluster_dataset(img_folder_path, csv_path, max_imbalance_degree=-1):
     """
-    Imbalance degree not yet implemented.
-    TODO: write this
+    Load filenames, labels and number of clusters from a dataset.
+    Imbalance degree not yet implemented, and must be pre-applied to the dataset for now.
+    Parameters
+    ----------
+    img_folder_path         :   str,
+                                path to the folder containing the images of the dataset
+    csv_path                :   str,
+                                path to the csv containing filenames and labels
+    max_imbalance_degree    :   float, default=-1
+                                degree of unbalance in the dataset between the largest and second largest class.
+
+    Returns
+    -------
+    file_names, labels, n_classes
+
     """
     seed = 123
     df = pd.read_csv(csv_path)
