@@ -19,12 +19,16 @@ class Niche:
         import numpy as np
         returns = np.zeros(batch_size)
         lengths = np.zeros(batch_size, dtype='int')
+        end_x_positions = np.zeros(batch_size)
+        results = np.zeros(batch_size, dtype='bool')
 
         for i, theta in enumerate(thetas):
-            returns[i], lengths[i] = self.rollout(theta, random_state=random_state,
-                                                  evaluate=eval, gather_obstacle_dataset=gather_obstacle_dataset)
+            returns[i], lengths[i], end_x_positions[i], results[i] = self.rollout(
+                theta, random_state=random_state,
+                evaluate=eval, gather_obstacle_dataset=gather_obstacle_dataset
+            )
 
-        return returns, lengths
+        return returns, lengths, end_x_positions, results
 
     @abstractmethod
     def rollout(self, theta, random_state, evaluate=False, render_mode=False, gather_obstacle_dataset=False):
