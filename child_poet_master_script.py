@@ -83,12 +83,9 @@ def main():
     parser.add_argument('--agent_tracker_certainty_threshold', type=float, default=0.8)
 
     args = parser.parse_args()
-    print(args.run_child_poet)
+    # print(args.run_child_poet)
 
     logger.info(args)
-
-    mlf_runs = r'file:/uio/hume/student-u31/eirikolb/Documents/child_poet/mlruns'
-    mlf.set_tracking_uri(mlf_runs)
 
     mlf.log_params(args.__dict__)
 
