@@ -5,4 +5,5 @@ gym[box2d]
 pandas
 matplotlib
 tensorflow
+keras
 mlflow
