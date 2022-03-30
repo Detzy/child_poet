@@ -64,6 +64,9 @@ class MultiESOptimizer:
 
         self.args = args
         self.predict_simulation = self.args.run_child_poet
+        self.agent_trackers = None
+        if self.predict_simulation:
+            self.agent_trackers = {}
 
         import fiber as mp
 
@@ -162,7 +165,8 @@ class MultiESOptimizer:
             predict_simulation=self.args.run_child_poet,
             omit_simulation=self.args.omit_simulation,
             agent_tracker_success_reward=self.args.child_success_reward,
-            agent_tracker_certainty_threshold=self.args.agent_tracker_certainty_threshold
+            agent_tracker_certainty_threshold=self.args.agent_tracker_certainty_threshold,
+            agent_trackers=self.agent_trackers,
         )
 
     def add_optimizer(self, env, cppn_params, seed, created_at=0, model_params=None):

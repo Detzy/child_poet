@@ -16,6 +16,7 @@
 import logging
 import time
 import numpy as np
+from copy import copy
 from collections import namedtuple
 from .stats import compute_centered_ranks, batched_weighted_sum
 from .logger import CSVLogger
@@ -170,7 +171,8 @@ class ESOptimizer:
                  predict_simulation=False,
                  omit_simulation=False,
                  agent_tracker_success_reward=0.5,
-                 agent_tracker_certainty_threshold=0.8):
+                 agent_tracker_certainty_threshold=0.8,
+                 agent_trackers=None):
 
         from .optimizers import Adam, SimpleSGD
 
@@ -201,6 +203,7 @@ class ESOptimizer:
         self.agent_tracker_success_reward = agent_tracker_success_reward
         self.obstacle_lib = None
         self.agent_tracker = None
+        self.agent_trackers = agent_trackers
         if self.predict_simulation:
             img_creator = niches[optim_id].img_creator
             img_classifier = ObstacleClassifier()
@@ -208,6 +211,7 @@ class ESOptimizer:
             self.obstacle_lib = ObstacleLibrary(img_creator, img_classifier)
 
             self.agent_tracker = AgentPerformanceTracker(certainty_threshold=agent_tracker_certainty_threshold)
+            self.agent_trackers[optim_id] = self.agent_tracker
 
         self.batches_per_chunk = batches_per_chunk
         self.batch_size = batch_size
@@ -289,9 +293,11 @@ class ESOptimizer:
         logger.debug('Optimizer {} cleaning up workers...'.format(
             self.optim_id))
 
-    def reset_agent_tracker(self):
-        print("Resetting agent tracker for optimiser:", self.optim_id)
-        self.agent_tracker = AgentPerformanceTracker()
+    def set_agent_tracker(self, proposal_source):
+        proposal_source = proposal_source.replace('_proposal', '')
+        print(f"Setting agent tracker in optimiser: {self.optim_id} to tracker from {proposal_source}")
+        self.agent_tracker = copy(self.agent_trackers[proposal_source])
+        self.agent_trackers[self.optim_id] = self.agent_tracker
 
     def clean_dicts_before_iter(self):
         self.log_data.clear()
@@ -330,10 +336,9 @@ class ESOptimizer:
                     self.proposal_theta,
                     reset_optimizer=reset_optimizer)
                 self.self_evals = self.proposal
-                # if self.predict_simulation:
-                    # We reset the agent tracker when performing an agent transfer,
-                    # because we assume the new environment will change the agent significantly
-                    # self.reset_agent_tracker()
+                if self.predict_simulation:
+                    # We copy over the agent tracker of the proposed source
+                    self.set_agent_tracker(self.proposal_source)
 
         self.checkpoint_thetas = np.array(self.theta)
         self.checkpoint_scores = self.self_evals
