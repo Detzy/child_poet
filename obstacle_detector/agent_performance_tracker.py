@@ -1,5 +1,6 @@
 import bisect
 import numpy as np
+from copy import copy
 from statistics import mean
 import tensorflow as tf
 from tensorflow.keras import layers, models
@@ -85,8 +86,11 @@ def get_index_before_and_after(pos, position_list):
 
 
 class AgentPerformanceTracker:
+    """
+    Tracks the performance of an agent in an environment.
+    """
 
-    def __init__(self, certainty_threshold=0.8, learning_rate=0.1, n_pos_score_limit=1000):
+    def __init__(self, certainty_threshold=0.8, learning_rate=0.1):
         """
         Tracks the performance of an agent against the classes of obstacles
 
@@ -115,6 +119,12 @@ class AgentPerformanceTracker:
         # self.positions = []
         # self.scores = []
         # self.n_pos_score_limit = n_pos_score_limit
+
+    def __copy__(self):
+        to_return = AgentPerformanceTracker(self._certainty_threshold, self._learning_rate)
+        to_return.obstacle_performance = self.obstacle_performance.copy()
+        to_return.model.set_weights(self.model.get_weights())
+        return to_return
 
     def get_class_performance(self, obstacle_class_id):
         if obstacle_class_id in self.obstacle_performance:
@@ -204,11 +214,15 @@ class AgentPerformanceTracker:
 
 if __name__ == '__main__':
     performance_updates = [(i % 10, 1) for i in range(100)]
-    end_x_pos = np.array([10 for i in range(100000)])
-    score = np.array([100 for i in range(100000)])
+    end_x_pos = np.array([10 for i in range(10000)])
+    score = np.array([100 for i in range(10000)])
 
     apt = AgentPerformanceTracker(certainty_threshold=0.0)
     apt.update_class_performance(performance_updates)
     apt.train_simulation_score(end_x_pos, score)
     print(apt.predict_simulation_score(10))
 
+    apt2 = copy(apt)
+    apt2.train_simulation_score(end_x_pos, score)
+    print(apt2.predict_simulation_score(10))
+    print(apt.predict_simulation_score(10))
