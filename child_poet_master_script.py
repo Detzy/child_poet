@@ -44,8 +44,8 @@ def run_main(args):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('--log_folder', default='logs')
-    parser.add_argument('--niche_folder', default='niches')
+    parser.add_argument('log_file')
+    parser.add_argument('niche_file')
     parser.add_argument('--mlflow_folder', default='mlruns')
     parser.add_argument('--save_to_dataset', default=False)
     parser.add_argument('--init', default='random')

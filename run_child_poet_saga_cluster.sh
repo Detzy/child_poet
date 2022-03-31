@@ -54,8 +54,8 @@ mkdir -p $SCRATCH/tmp/niche_encodings/$experiment
 cd $SCRATCH/child_poet
 
 srun python -u child_poet_master_script.py \
-  --log_folder=$SCRATCH/tmp/logs/$experiment \
-  --niche_folder=$SCRATCH/tmp/niche_encodings/$experiment \
+  $SCRATCH/tmp/logs/$experiment \
+  $SCRATCH/tmp/niche_encodings/$experiment \
   --init=random \
   --learning_rate=0.01 \
   --lr_decay=0.9999 \
