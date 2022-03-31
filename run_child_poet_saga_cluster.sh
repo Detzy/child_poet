@@ -6,7 +6,7 @@
 #SBATCH --account=nn9740k
 #
 # Wall clock limit (hh:mm:ss):
-#SBATCH --time=72:00:00
+#SBATCH --time=1:00:00
 #
 ## Allocates cpus
 #SBATCH --ntasks=1 --cpus-per-task=50
