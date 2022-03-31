@@ -8,3 +8,4 @@ img/*
 /mlruns/
 /cnn_models/
 !/cnn_models/default_model
+.idea
