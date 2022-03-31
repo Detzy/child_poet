@@ -4,7 +4,7 @@ from tensorflow.keras import layers, models
 import mlflow as mlf
 import numpy as np
 
-DEFAULT_MODEL = r'cnn_models/default_model'
+DEFAULT_MODEL = r'default_model'
 
 
 class ObstacleClassifier:

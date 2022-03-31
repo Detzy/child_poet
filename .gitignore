@@ -9,3 +9,4 @@ img/*
 /cnn_models/
 !/cnn_models/default_model
 .idea
+variables
