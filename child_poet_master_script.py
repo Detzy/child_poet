@@ -78,7 +78,9 @@ def main():
     parser.add_argument('--stochastic', action='store_true', default=False)
     parser.add_argument('--envs', nargs='+')
     parser.add_argument('--start_from', default=None)  # Json file to start from
+    # Whether or not to run the CHILD set of features, which predict simulation outcome:
     parser.add_argument('--run_child_poet', action='store_true', default=False)
+    # Whether or not to run the part of CHILD that skips simulation when score estimates have been made:
     parser.add_argument('--omit_simulation', action='store_true', default=False)
     parser.add_argument('--child_success_reward', type=float, default=0.5)
     parser.add_argument('--agent_tracker_certainty_threshold', type=float, default=0.8)
