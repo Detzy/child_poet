@@ -593,9 +593,6 @@ class ESOptimizer:
                 agent_tracker.predict_simulation_distance(*self.obstacle_lib.get_terrain_classes())
             if predicted_sim_dist is not None:
                 predicted_sim_score = agent_tracker.predict_simulation_score(predicted_sim_dist)
-                mlf.log_metric("predicted_simulation_distance", predicted_sim_dist)
-                mlf.log_metric("predicted_simulation_outcome", predicted_sim_outcome)
-                mlf.log_metric("predicted_simulation_score", predicted_sim_score)
 
         if self.omit_simulation and predicted_sim_score is not None:
             eval_tasks = None
@@ -634,7 +631,7 @@ class ESOptimizer:
                 f'get_theta_eval {self.optim_id} finished running {0} episodes, {0} timesteps'
             )
 
-            mlf.log_metric("time_elapsed", time_elapsed)
+            mlf.log_metric("time_elapsed_omit", time_elapsed)
 
             return EvalStats(
                 eval_returns_mean=predicted_sim_score,
@@ -655,9 +652,11 @@ class ESOptimizer:
                 print(f'\nPredicted distance: {predicted_sim_dist}, predicted score: {predicted_sim_score}')
                 print(f'Actual simulated distances: {end_x_positions}, actual scores: {eval_returns}')
 
-                mlf.log_metric("real_simulation_distance", end_x_positions.mean())
-                mlf.log_metric("real_simulation_score", eval_returns.mean())
-                # mlf.log_metric("real_simulation_outcome")
+                if predicted_sim_dist is not None and predicted_sim_score is not None:
+                    mlf.log_metric("predicted_simulation_distance", predicted_sim_dist)
+                    mlf.log_metric("predicted_simulation_score", predicted_sim_score)
+                    mlf.log_metric("real_simulation_distance", end_x_positions.mean())
+                    mlf.log_metric("real_simulation_score", eval_returns.mean())
 
                 obstacle_classes, obstacle_positions = self.obstacle_lib.get_terrain_classes()
                 performance_updates = interpolate_performance_updates(
@@ -674,6 +673,9 @@ class ESOptimizer:
 
             step_t_end = time.time()
 
+            time_elapsed = step_t_end - step_t_start
+            mlf.log_metric("time_elapsed", time_elapsed)
+
             logger.debug(
                 f'get_theta_eval {self.optim_id} finished running {len(eval_returns)} episodes, {eval_lengths.sum()} timesteps'
             )
@@ -685,7 +687,7 @@ class ESOptimizer:
                 eval_len_mean=eval_lengths.mean(),
                 eval_len_std=eval_lengths.std(),
                 eval_n_episodes=len(eval_returns),
-                time_elapsed=step_t_end - step_t_start,
+                time_elapsed=time_elapsed,
             )
 
     def start_step(self, theta=None, gather_obstacle_dataset=False):
