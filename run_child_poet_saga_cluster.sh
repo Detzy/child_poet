@@ -6,10 +6,10 @@
 #SBATCH --account=nn9740k
 #
 # Wall clock limit (hh:mm:ss):
-#SBATCH --time=1:00:00
+#SBATCH --time=72:00:00
 #
 ## Allocates cpus
-#SBATCH --ntasks=1 --cpus-per-task=4
+#SBATCH --ntasks=1 --cpus-per-task=20
 #
 ## allocates ram per cpu
 #SBATCH --mem-per-cpu=1G
@@ -80,7 +80,7 @@ srun python -u child_poet_master_script.py \
   --steps_before_transfer=25 \
   --max_children=16 \
   --max_admitted=1 \
-  --num_workers 4 \
+  --num_workers 20 \
   --run_child_poet \
   --child_success_reward=0.5 \
   --agent_tracker_certainty_threshold=0.8 \
