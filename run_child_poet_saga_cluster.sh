@@ -12,7 +12,7 @@
 #SBATCH --ntasks=1 --cpus-per-task=4
 #
 ## allocates ram per cpu
-#SBATCH --mem-per-cpu=100M
+#SBATCH --mem-per-cpu=1G
 
 ## Set up job environment:
 module --quiet purge   # clear any inherited modules
