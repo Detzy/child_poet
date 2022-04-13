@@ -6,7 +6,7 @@
 #SBATCH --account=nn9740k
 #
 # Wall clock limit (hh:mm:ss):
-#SBATCH --time=72:00:00
+#SBATCH --time=96:00:00
 #
 ## Allocates cpus
 #SBATCH --ntasks=1 --cpus-per-task=20
@@ -84,7 +84,8 @@ srun python -u child_poet_master_script.py \
   --run_child_poet \
   --child_success_reward=0.5 \
   --agent_tracker_certainty_threshold=0.8 \
+  --start_from=$SCRATCH/tmp/logs/poet_dec2_168h/poet_dec2_168h.flat.best.json \
   --n_iterations=60000 2>&1 | tee ~/tmp/ipp/$experiment/run.log
 
-## Exit 
+## Exit
 exit 0
