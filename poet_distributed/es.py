@@ -631,7 +631,7 @@ class ESOptimizer:
                 f'get_theta_eval {self.optim_id} finished running {0} episodes, {0} timesteps'
             )
 
-            mlf.log_metric("time_elapsed_omit", time_elapsed)
+            mlf.log_metric(f"time_elapsed_omit_{self.optim_id}", time_elapsed)
 
             return EvalStats(
                 eval_returns_mean=predicted_sim_score,
@@ -653,10 +653,10 @@ class ESOptimizer:
                 print(f'Actual simulated distances: {end_x_positions}, actual scores: {eval_returns}')
 
                 if predicted_sim_dist is not None and predicted_sim_score is not None:
-                    mlf.log_metric("predicted_simulation_distance", predicted_sim_dist)
-                    mlf.log_metric("predicted_simulation_score", predicted_sim_score)
-                    mlf.log_metric("real_simulation_distance", end_x_positions.mean())
-                    mlf.log_metric("real_simulation_score", eval_returns.mean())
+                    mlf.log_metric(f"predicted_simulation_distance_{self.optim_id}", predicted_sim_dist)
+                    mlf.log_metric(f"predicted_simulation_score_{self.optim_id}", predicted_sim_score)
+                    mlf.log_metric(f"real_simulation_distance_{self.optim_id}", end_x_positions.mean())
+                    mlf.log_metric(f"real_simulation_score_{self.optim_id}", eval_returns.mean())
 
                 obstacle_classes, obstacle_positions = self.obstacle_lib.get_terrain_classes()
                 performance_updates = interpolate_performance_updates(
@@ -674,7 +674,7 @@ class ESOptimizer:
             step_t_end = time.time()
 
             time_elapsed = step_t_end - step_t_start
-            mlf.log_metric("time_elapsed", time_elapsed)
+            mlf.log_metric(f"time_elapsed_{self.optim_id}", time_elapsed)
 
             logger.debug(
                 f'get_theta_eval {self.optim_id} finished running {len(eval_returns)} episodes, {eval_lengths.sum()} timesteps'
@@ -732,30 +732,32 @@ class ESOptimizer:
 
         _, po_returns, po_lengths = self.collect_po_results(step_results)
 
-        if self.predict_simulation:
-            # Train the agent_tracker on the performance of simulation
-            end_x_positions, results = self.collect_position_results(step_results)
-            obstacle_classes, obstacle_positions = self.obstacle_lib.get_terrain_classes()
-
-            performance_updates_0 = interpolate_performance_updates(
-                obstacle_classes, obstacle_positions,
-                end_x_positions[:, 0], results[:, 0],
-                self.agent_tracker_success_reward,
-            )
-
-            performance_updates_1 = interpolate_performance_updates(
-                obstacle_classes, obstacle_positions,
-                end_x_positions[:, 1], results[:, 1],
-                self.agent_tracker_success_reward,
-            )
-
-            # Train the distance predictor
-            self.agent_tracker.update_class_performance(performance_updates_0)
-            self.agent_tracker.update_class_performance(performance_updates_1)
-
-            # Train the score predictor
-            self.agent_tracker.train_simulation_score(positions=end_x_positions[:, 0], scores=po_returns[:, 0])
-            self.agent_tracker.train_simulation_score(positions=end_x_positions[:, 1], scores=po_returns[:, 1])
+        # MAJOR CHANGE: WE STOP TRAINING THE AGENT TRACKER ON THE TRAINING SIMULATIONS,
+        # DUE TO THE LARGE GAP IN PERFORMANCE BETWEEN THE SOLUTIONS MADE DURING TRAINING.
+        # if self.predict_simulation:
+        #     # Train the agent_tracker on the performance of simulation
+        #     end_x_positions, results = self.collect_position_results(step_results)
+        #     obstacle_classes, obstacle_positions = self.obstacle_lib.get_terrain_classes()
+        #
+        #     performance_updates_0 = interpolate_performance_updates(
+        #         obstacle_classes, obstacle_positions,
+        #         end_x_positions[:, 0], results[:, 0],
+        #         self.agent_tracker_success_reward,
+        #     )
+        #
+        #     performance_updates_1 = interpolate_performance_updates(
+        #         obstacle_classes, obstacle_positions,
+        #         end_x_positions[:, 1], results[:, 1],
+        #         self.agent_tracker_success_reward,
+        #     )
+        #
+        #     # Train the distance predictor
+        #     self.agent_tracker.update_class_performance(performance_updates_0)
+        #     self.agent_tracker.update_class_performance(performance_updates_1)
+        #
+        #     # Train the score predictor
+        #     self.agent_tracker.train_simulation_score(positions=end_x_positions[:, 0], scores=po_returns[:, 0])
+        #     self.agent_tracker.train_simulation_score(positions=end_x_positions[:, 1], scores=po_returns[:, 1])
 
         episodes_this_step = len(po_returns)
         timesteps_this_step = po_lengths.sum()
