@@ -105,12 +105,13 @@ if __name__ == "__main__":
     If an agent dies, the location of its stumble is drawn
     """
     test_run_name = 'sep30_overnight'
+    test_run_name = 'apr19_96h'
     test_seeds = [12]
 
     for test_seed in test_seeds:
-        novel_environments = generate_novel_cppn_environments(n_environments=2, n_mutations=50, seed=test_seed)
+        novel_environments = generate_novel_cppn_environments(n_environments=1, n_mutations=50, seed=test_seed)
         print("done")
 
-        for current_agent_model_json in get_model_file_iterator(training_run=test_run_name):
+        for i, current_agent_model_json in enumerate(get_model_file_iterator(training_run=test_run_name)):
             for current_cppn_genome in novel_environments:
                 main(model_file=current_agent_model_json, cppn_genome_path=current_cppn_genome, seed=test_seed)
