@@ -27,6 +27,9 @@ from poet_distributed.novelty import compute_novelty_vs_archive
 logger = logging.getLogger(__name__)
 
 
+CPPN_MUTATION_RATE = 3
+
+
 def load_agent_model(filename):
     with open(filename) as f:
         data = json.load(f)
@@ -376,7 +379,11 @@ class MultiESOptimizer:
         assert optim_id in self.env_registry.keys()
         parent_env_config, parent_cppn_params = self.env_registry[optim_id]
         child_env_config = self.env_reproducer.mutate(parent_env_config, no_mutate=True)  # Only sets a new name
-        child_cppn_params = parent_cppn_params.get_mutated_params(cppn_path_string=self.args.niche_file)
+
+        # Generate a new environment by mutating the parent environment 'CPPN_MUTATION_RATE' times
+        child_cppn_params = parent_cppn_params
+        for i in range(CPPN_MUTATION_RATE):
+            child_cppn_params = child_cppn_params.get_mutated_params(cppn_path_string=self.args.niche_file)
 
         logger.info("we pick to mutate: {} and we got {} back".format(optim_id, child_env_config.name))
         logger.debug("parent")
