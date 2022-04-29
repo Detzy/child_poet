@@ -90,7 +90,7 @@ class AgentPerformanceTracker:
     Tracks the performance of an agent in an environment.
     """
 
-    def __init__(self, certainty_threshold=0.8, learning_rate=0.1):
+    def __init__(self, certainty_threshold=0.8, learning_rate=0.1, agent_id=0):
         """
         Tracks the performance of an agent against the classes of obstacles
 
@@ -101,6 +101,7 @@ class AgentPerformanceTracker:
         """
         self._certainty_threshold = certainty_threshold
         self._learning_rate = learning_rate
+        self.agent_id = agent_id
         self.obstacle_performance = {}
 
         self.model = models.Sequential()
@@ -121,7 +122,7 @@ class AgentPerformanceTracker:
         # self.n_pos_score_limit = n_pos_score_limit
 
     def __copy__(self):
-        to_return = AgentPerformanceTracker(self._certainty_threshold, self._learning_rate)
+        to_return = AgentPerformanceTracker(self._certainty_threshold, self._learning_rate, self.agent_id)
         to_return.obstacle_performance = self.obstacle_performance.copy()
         to_return.model.set_weights(self.model.get_weights())
         return to_return

@@ -210,7 +210,10 @@ class ESOptimizer:
             img_classifier.load_model(DEFAULT_MODEL)
             self.obstacle_lib = ObstacleLibrary(img_creator, img_classifier)
 
-            self.agent_tracker = AgentPerformanceTracker(certainty_threshold=agent_tracker_certainty_threshold)
+            self.agent_tracker = AgentPerformanceTracker(
+                certainty_threshold=agent_tracker_certainty_threshold,
+                agent_id=optim_id,
+            )
             self.agent_trackers[optim_id] = self.agent_tracker
 
         self.batches_per_chunk = batches_per_chunk
@@ -297,6 +300,7 @@ class ESOptimizer:
         proposal_source = proposal_source.replace('_proposal', '')
         print(f"Setting agent tracker in optimiser: {self.optim_id} to tracker from {proposal_source}")
         self.agent_tracker = copy(self.agent_trackers[proposal_source])
+        self.agent_tracker.agent_id = self.optim_id
         self.agent_trackers[self.optim_id] = self.agent_tracker
 
     def clean_dicts_before_iter(self):
@@ -604,7 +608,7 @@ class ESOptimizer:
                 gather_obstacle_dataset
             )
 
-        return eval_tasks, theta, step_t_start, predicted_sim_dist, predicted_sim_score
+        return eval_tasks, theta, step_t_start, predicted_sim_dist, predicted_sim_score, agent_tracker
 
     def get_theta_eval(self, res):
         """
@@ -622,7 +626,7 @@ class ESOptimizer:
         -------
         EvalStats
         """
-        eval_tasks, theta, step_t_start, predicted_sim_dist, predicted_sim_score = res
+        eval_tasks, theta, step_t_start, predicted_sim_dist, predicted_sim_score, agent_tracker = res
         if self.omit_simulation and eval_tasks is None:
             step_t_end = time.time()
             time_elapsed = step_t_end - step_t_start
@@ -657,6 +661,22 @@ class ESOptimizer:
                     mlf.log_metric(f"predicted_simulation_score_{self.optim_id}", predicted_sim_score)
                     mlf.log_metric(f"real_simulation_distance_{self.optim_id}", end_x_positions.mean())
                     mlf.log_metric(f"real_simulation_score_{self.optim_id}", eval_returns.mean())
+
+                    mlf.log_metric(f"predicted_simulation_distance_{agent_tracker.agent_id}agent", predicted_sim_dist)
+                    mlf.log_metric(f"predicted_simulation_score_{agent_tracker.agent_id}agent", predicted_sim_score)
+                    mlf.log_metric(f"real_simulation_distance_{agent_tracker.agent_id}agent", end_x_positions.mean())
+                    mlf.log_metric(f"real_simulation_score_{agent_tracker.agent_id}agent", eval_returns.mean())
+
+                    if self.optim_id == agent_tracker.agent_id:
+                        mlf.log_metric(f"predicted_simulation_distance_{agent_tracker.agent_id}home", predicted_sim_dist)
+                        mlf.log_metric(f"predicted_simulation_score_{agent_tracker.agent_id}home", predicted_sim_score)
+                        mlf.log_metric(f"real_simulation_distance_{agent_tracker.agent_id}home", end_x_positions.mean())
+                        mlf.log_metric(f"real_simulation_score_{agent_tracker.agent_id}home", eval_returns.mean())
+                    else:
+                        mlf.log_metric(f"predicted_simulation_distance_{agent_tracker.agent_id}away", predicted_sim_dist)
+                        mlf.log_metric(f"predicted_simulation_score_{agent_tracker.agent_id}away", predicted_sim_score)
+                        mlf.log_metric(f"real_simulation_distance_{agent_tracker.agent_id}away", end_x_positions.mean())
+                        mlf.log_metric(f"real_simulation_score_{agent_tracker.agent_id}away", eval_returns.mean())
 
                 obstacle_classes, obstacle_positions = self.obstacle_lib.get_terrain_classes()
                 performance_updates = interpolate_performance_updates(
