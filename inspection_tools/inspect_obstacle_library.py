@@ -29,10 +29,12 @@ if __name__ == "__main__":
     Generate a set of novel cppn encodings, then run some list of agents on these.
     If an agent dies, the location of its stumble is drawn
     """
-    test_run_name = 'sep30_overnight'
-    test_seeds = [12]
+    test_run_name = 'apr24_96h'
+    cppn_genome_folder = f'/uio/hume/student-u31/eirikolb/tmp/niche_encodings/poet_{test_run_name}/'
+    optimizer_name = 'e6519872-47b0-4073-ba31-bbbfa3f3a07d'
+    cppn_genome = cppn_genome_folder + f'genome_{optimizer_name}_saved.pickle'
 
-    for test_seed in test_seeds:
-        novel_environments = generate_novel_cppn_environments(n_environments=1, n_mutations=50, seed=test_seed)
-        for current_cppn_genome in novel_environments:
-            main(cppn_genome_path=current_cppn_genome)
+    # test_seeds = [12]
+    # novel_environments = generate_novel_cppn_environments(n_environments=1, n_mutations=50, seed=test_seed)
+
+    main(cppn_genome_path=cppn_genome)
