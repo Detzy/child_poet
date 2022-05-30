@@ -657,10 +657,10 @@ class ESOptimizer:
                 print(f'Actual simulated distances: {end_x_positions}, actual scores: {eval_returns}')
 
                 if predicted_sim_dist is not None and predicted_sim_score is not None:
-                    mlf.log_metric(f"predicted_simulation_distance_{self.optim_id}", predicted_sim_dist)
-                    mlf.log_metric(f"predicted_simulation_score_{self.optim_id}", predicted_sim_score)
-                    mlf.log_metric(f"real_simulation_distance_{self.optim_id}", end_x_positions.mean())
-                    mlf.log_metric(f"real_simulation_score_{self.optim_id}", eval_returns.mean())
+                    mlf.log_metric(f"predicted_simulation_distance_{self.optim_id}env", predicted_sim_dist)
+                    mlf.log_metric(f"predicted_simulation_score_{self.optim_id}env", predicted_sim_score)
+                    mlf.log_metric(f"real_simulation_distance_{self.optim_id}env", end_x_positions.mean())
+                    mlf.log_metric(f"real_simulation_score_{self.optim_id}env", eval_returns.mean())
 
                     mlf.log_metric(f"predicted_simulation_distance_{agent_tracker.agent_id}agent", predicted_sim_dist)
                     mlf.log_metric(f"predicted_simulation_score_{agent_tracker.agent_id}agent", predicted_sim_score)
