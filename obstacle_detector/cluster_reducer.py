@@ -229,6 +229,16 @@ def reduce_dcc_clusters(cluster_data_directory, out_data_dir, k, lr, class_zero_
         else:
             path_to_csv = os.path.join(img_cluster_path, r'img_k{}_lr{}_threshold{}.csv'.format(k, lr, threshold))
 
+        # print the size of each cluster before and after thresholding
+        # print('Threshold: {}'.format(threshold))
+        # print('Before: {}'.format(len(clustering)))
+        # print('After thresholding: {}'.format(len(clustering_above_threshold)))
+        # print('After class 0 balancing: {}'.format(len(scaled_clusters)))
+
+        print(f'Threshold: {threshold}')
+        print(f'Before: {len(clustering)} images, {len(set(clustering))} clusters')
+        print(f'After thresholding: {len(clusters)} images, {len(set(clusters))} clusters')
+        print(f'After class 0 balancing: {len(scaled_clusters)} images, {len(set(scaled_clusters))} clusters')
         df.to_csv(path_to_csv)
 
 
