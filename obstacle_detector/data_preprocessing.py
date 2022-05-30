@@ -269,9 +269,9 @@ def increment_loop(to_inc, top, decrement=False):
 if __name__ == "__main__":
     current_folder_path = r'/uio/hume/student-u31/eirikolb/img/poet_dec2_168h'
     image_folder_path = current_folder_path + '/img_files'
-    imbalance_degree = 4  # Only used for printing information
-    only_print_number_of_files = False
-    should_display_images = True
+    imbalance_degree = 100  # Only used for printing information
+    only_print_number_of_files = True
+    should_display_images = False
 
     # if not only_print_number_of_files:
     #     # Clean and visualize data for non-obstacles
